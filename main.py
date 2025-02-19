@@ -3,6 +3,9 @@ import xml.etree.ElementTree as ET
 from astrbot.api.all import *
 from astrbot.api.event.filter import *
 
+download_dir = "./downloads/"
+os.makedirs(download_dir, exist_ok=True)
+
 
 @register("opds", "Your Name", "一个基于OPDS的电子书搜索和下载插件", "0.0.1", "repo url")
 class OPDS(Star):
@@ -74,9 +77,12 @@ class OPDS(Star):
         try:
             logger.error(f"XML data: {xml_data}")
             root = ET.fromstring(xml_data)  # 把 XML 转换为元素树
-            namespace = {"default": "http://www.w3.org/2005/Atom"}  # 定义命名空间
+            # namespace = {"default": "http://www.w3.org/2005/Atom"}  # 定义命名空间
+            # 动态提取命名空间
+            namespace = {"default": root.tag[root.tag.find("{") + 1:root.tag.find("}")]}  # 提取默认命名空间
+            logger.debug(f"Extracted Namespace: {namespace}")
+
             entries = root.findall("default:entry", namespace)  # 查找所有 <entry> 节点
-            logger.error(len(root.findall("default:entry", namespace)))
 
             results = []
             for entry in entries:
@@ -157,7 +163,7 @@ class OPDS(Star):
                     if response.status == 200:
                         # 保存下载的文件
                         file_name = ebook_url.split("/")[-1]
-                        with open(f"./downloads/{file_name}", "wb") as file:
+                        with open(f"{download_dir}{file_name}", "wb") as file:
                             file.write(await response.read())
                         logger.info(f"电子书 {file_name} 下载完成。")
                         file = File(name=file_name, file=f"./downloads/{file_name}")

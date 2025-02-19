@@ -5,7 +5,7 @@ from astrbot.api.all import *
 from astrbot.api.event.filter import *
 
 
-@register("opds", "Your Name", "一个基于OPDS的电子书搜索和下载插件", "1.0.0", "repo url")
+@register("opds", "Your Name", "一个基于OPDS的电子书搜索和下载插件", "0.0.1", "repo url")
 class OPDS(Star):
     def __init__(self, context: Context, config: dict):
         super().__init__(context)

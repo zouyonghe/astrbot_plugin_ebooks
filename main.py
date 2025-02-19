@@ -197,8 +197,8 @@ class OPDS(Star):
 
                         # 如果未获取到文件名，使用默认值
                         if not book_name or book_name.strip() == "":
-                            logger.error(f"无法提取书名，书籍地址: {ebook_url}")
-                            yield event.plain_result("无法提取书名，取消发送。")
+                            logger.error(f"无法提取书名，电子书地址: {ebook_url}")
+                            yield event.plain_result("无法提取书名，取消发送电子书。")
                             return 
                             
                         # 发送文件到用户
@@ -245,7 +245,7 @@ class OPDS(Star):
                     async for result in self._show_result(event, results):
                         yield result
                 else:
-                    yield event.plain_result("未能找到匹配的图书，请检查书名或尝试更精确的关键词。")
+                    yield event.plain_result("未能找到匹配的电子书，请提供准确书名或电子书下载链接。")
                     return
             async for result in self.receive(event, ebook_url):
                 yield result

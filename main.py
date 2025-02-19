@@ -274,7 +274,7 @@ class OPDS(Star):
                         # logger.info(f"电子书 {file_name} 下载完成，路径: {file_path}")
 
                         # 发送文件到用户
-                        file = File(file=ebook_url)
+                        file = File(name="", file=ebook_url)
                         yield event.chain_result([file])
 
                         # # 删除下载的文件

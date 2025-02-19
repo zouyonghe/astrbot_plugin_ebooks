@@ -56,6 +56,7 @@ class OPDS(Star):
 
         search_url = f"{opds_url}/opds/search/{query}"  # 根据实际路径构造 API URL
         logger.error(f"{search_url}")
+        logger.error(f"OPDS API URL: {repr(search_url)}")
         auth = aiohttp.BasicAuth(username, password)  # 使用 Basic Authentication
 
         async with aiohttp.ClientSession(auth=auth) as session:

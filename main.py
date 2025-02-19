@@ -1,5 +1,4 @@
 import re
-import time
 import xml.etree.ElementTree as ET
 from urllib.parse import quote_plus, urljoin, unquote
 
@@ -8,11 +7,35 @@ import aiohttp
 from astrbot.api.all import *
 from astrbot.api.event.filter import *
 
+
 @register("opds", "buding", "一个基于OPDS的电子书搜索和下载插件", "1.0.0", "https://github.com/zouyonghe/astrbot_plugin_opds")
 class OPDS(Star):
     def __init__(self, context: Context, config: dict):
         super().__init__(context)
         self.config = config
+
+    async def _show_result(self, event: AstrMessageEvent, results: list):
+        chain = [
+            Plain("以下是电子书搜索结果："),
+        ]
+        for idx, item in enumerate(results):
+            chain.append(
+                Plain(f"\n{idx + 1}. {item['title']} by {item.get('authors', '未知作者')}\n")
+            )
+            if item.get("cover_link"):
+                chain.append(Image.fromURL(item["cover_link"]))
+            chain.append(Plain(f"描述: {item.get('summary', '暂无描述')}\n"))
+            chain.append(Plain(f"下载链接: {item['download_link']}\n"))
+
+        if len(results) <= 3:
+            yield event.chain_result(chain)
+        else:
+            node = Node(
+                uin=event.get_self_id(),
+                name="OPDS",
+                content=chain
+            )
+            yield event.chain_result([node])
 
     @command_group("opds")
     def opds(self):
@@ -30,27 +53,8 @@ class OPDS(Star):
             if not results:
                 yield event.plain_result("未找到相关的电子书。")
             else:
-                chain = [
-                    Plain("以下是电子书搜索结果："),
-                ]
-                for idx, item in enumerate(results):
-                    chain.append(
-                        Plain(f"\n{idx + 1}. {item['title']} by {item.get('authors', '未知作者')}\n")
-                    )
-                    if item.get("cover_link"):
-                        chain.append(Image.fromURL(item["cover_link"]))
-                    chain.append(Plain(f"描述: {item.get('summary', '暂无描述')}\n"))
-                    chain.append(Plain(f"下载链接: {item['download_link']}\n"))
-
-                if len(results) <= 3:
-                    yield event.chain_result(chain)
-                else:
-                    node = Node(
-                        uin=event.get_self_id(),
-                        name="OPDS",
-                        content=chain
-                    )
-                    yield event.chain_result([node])
+                async for result in self._show_result(event, results):
+                    yield result
         except Exception as e:
             logger.error(f"OPDS搜索失败: {e}")
             yield event.plain_result("搜索过程中出现错误，请稍后重试。")
@@ -162,49 +166,89 @@ class OPDS(Star):
             logger.error(f"解析 OPDS 响应失败: {e}")
             return None
 
-    @opds.command("download")
-    async def download(self, event: AstrMessageEvent, ebook_url: str = None):
-        '''下载 OPDS 提供的电子书'''
+    @opds.command("receive")
+    async def receive(self, event: AstrMessageEvent, ebook_url: str = None):
+        '''通过 OPDS 协议接收电子书'''
         if not ebook_url:
             yield event.plain_result("请输入电子书的下载链接。")
             return
 
-        username = self.config.get("opds_username")
-        password = self.config.get("opds_password")
-
-        auth = aiohttp.BasicAuth(username, password)
-
         try:
-            async with aiohttp.ClientSession(auth=auth) as session:
+            async with aiohttp.ClientSession() as session:
                 async with session.get(ebook_url) as response:
                     if response.status == 200:
                         # 从 Content-Disposition 提取文件名
                         content_disposition = response.headers.get("Content-Disposition")
-                        file_name = None
+                        book_name = None
 
                         if content_disposition:
-                            logger.info(f"Content-Disposition: {content_disposition}")
+                            logger.debug(f"Content-Disposition: {content_disposition}")
 
                             # 先检查是否有 filename*= 条目
-                            file_name_match = re.search(r'filename\*=(?:UTF-8\'\')?([^;]+)', content_disposition)
-                            if file_name_match:
-                                file_name = file_name_match.group(1)
-                                file_name = unquote(file_name)  # 解码 URL 编码的文件名
+                            book_name_match = re.search(r'filename\*=(?:UTF-8\'\')?([^;]+)', content_disposition)
+                            if book_name_match:
+                                book_name = book_name_match.group(1)
+                                book_name = unquote(book_name)  # 解码 URL 编码的文件名
                             else:
                                 # 如果没有 filename*，则查找普通的 filename
-                                file_name_match = re.search(r'filename=["\']?([^;\']+)["\']?', content_disposition)
-                                if file_name_match:
-                                    file_name = file_name_match.group(1)
+                                book_name_match = re.search(r'filename=["\']?([^;\']+)["\']?', content_disposition)
+                                if book_name:
+                                    book_name = book_name_match.group(1)
 
                         # 如果未获取到文件名，使用默认值
-                        if not file_name or file_name.strip() == "":
-                            file_name = f"file_{int(time.time())}.epub"
-
+                        if not book_name or book_name.strip() == "":
+                            logger.error(f"无法提取书名，书籍地址: {ebook_url}")
+                            yield event.plain_result("无法提取书名，取消发送。")
+                            return 
+                            
                         # 发送文件到用户
-                        file = File(name=file_name, file=ebook_url)
+                        file = File(name=book_name, file=ebook_url)
                         yield event.chain_result([file])
                     else:
                         yield event.plain_result(f"无法下载电子书，状态码: {response.status}")
         except Exception as e:
             logger.error(f"下载失败: {e}")
             yield event.plain_result("下载过程中出现错误，请稍后重试。")
+            
+    @llm_tool("opds_search_books")
+    async def search_books(self, event: AstrMessageEvent, query: str):
+        """Search books by keywords or title through OPDS.
+
+        Args:
+            query (string): The search keyword or title to find books in the OPDS catalog.
+        """
+        async for result in self.search(event, query):
+            yield result
+
+    @llm_tool("opds_receive_book")
+    async def receive_book(self, event: AstrMessageEvent, book_identifier: str):
+        """Send a book to the user based on a precise name or URL.
+    
+        Args:
+            book_identifier (string): The exact book name or URL to locate and send the book.
+        """
+        try:
+            ebook_url = ""
+            # First, determine if the identifier is a URL or a book name
+            if book_identifier.lower().startswith("http://") or book_identifier.lower().startswith("https://"):
+                ebook_url = book_identifier
+            else:
+                # Search the book by name
+                results = await self.search_opds(quote_plus(book_identifier))
+                matched_books = [
+                    book for book in results if book_identifier.lower() in book["title"].lower()
+                ]
+
+                if len(matched_books) == 1:
+                    ebook_url = matched_books[0]["download_link"]
+                elif len(matched_books) > 1:
+                    async for result in self._show_result(event, results):
+                        yield result
+                else:
+                    yield event.plain_result("未能找到匹配的图书，请检查书名或尝试更精确的关键词。")
+                    return
+            async for result in self.receive(event, ebook_url):
+                yield result
+        except Exception as e:
+            logger.error(f"处理书籍接收过程中出现错误: {e}")
+            yield event.plain_result("处理请求时发生错误，请稍后重试或检查输入是否正确。")

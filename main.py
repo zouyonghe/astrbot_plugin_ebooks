@@ -18,9 +18,8 @@ class OPDS(Star):
         pass
 
     @opds.command("search")
-    async def search(self, event: AstrMessageEvent):
+    async def search(self, event: AstrMessageEvent, query: str):
         '''搜索 OPDS 电子书目录'''
-        query = event.message_str.strip()  # 获取用户输入的查询关键词
         if not query:
             yield event.plain_result("请输入搜索关键词。")
             return
@@ -76,7 +75,6 @@ class OPDS(Star):
     def parse_opds_response(self, xml_data: str):
         '''解析 OPDS 搜索结果 XML 数据'''
         try:
-            logger.error(f"XML data: {xml_data}")
             root = ET.fromstring(xml_data)  # 把 XML 转换为元素树
             namespace = {"default": "http://www.w3.org/2005/Atom"}  # 定义命名空间
             entries = root.findall("default:entry", namespace)  # 查找所有 <entry> 节点

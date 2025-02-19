@@ -60,49 +60,21 @@ class OPDS(Star):
         password = self.config.get("opds_password")  # 从配置中获取密码
 
         search_url = f"{opds_url}/opds/search/{query}"  # 根据实际路径构造 API URL
-        # auth = aiohttp.BasicAuth(username, password)  # 使用 Basic Authentication
-        #
-        # async with aiohttp.ClientSession(auth=auth) as session:
-        #     async with session.get(search_url) as response:
-        #         if response.status == 200:
-        #             content_type = response.headers.get("Content-Type", "")
-        #             if "application/atom+xml" in content_type:
-        #                 data = await response.text()
-        #                 return self.parse_opds_response(data)  # 调用解析方法
-        #             else:
-        #                 logger.error(f"Unexpected content type: {content_type}")
-        #                 return None
-        #         else:
-        #             logger.error(f"OPDS搜索失败，状态码: {response.status}")
-        #             return None
-        # 使用 Basic Authentication 构造请求
-        auth = (username, password) if username and password else None
+        auth = aiohttp.BasicAuth(username, password)  # 使用 Basic Authentication
 
-        # 构造查询 URL
-        query_encoded = quote_plus(query.strip() if query else "")
-        if not query_encoded:
-            raise ValueError("搜索关键词不能为空")
-        search_url = f"{opds_url}/opds/search/{query_encoded}"
-
-        try:
-            # 发起同步请求
-            response = requests.get(search_url, auth=auth, timeout=10)
-
-            # 检查响应状态码
-            if response.status_code == 200:
-                content_type = response.headers.get("Content-Type", "")
-                if "application/atom+xml" in content_type:
-                    return self.parse_opds_response(response.text)  # 调用解析方法
+        async with aiohttp.ClientSession() as session:
+            async with session.get(search_url) as response:
+                if response.status == 200:
+                    content_type = response.headers.get("Content-Type", "")
+                    if "application/atom+xml" in content_type:
+                        data = await response.text()
+                        return self.parse_opds_response(data)  # 调用解析方法
+                    else:
+                        logger.error(f"Unexpected content type: {content_type}")
+                        return None
                 else:
-                    logger.error(f"Unexpected content type: {content_type}")
+                    logger.error(f"OPDS搜索失败，状态码: {response.status}")
                     return None
-            else:
-                logger.error(f"OPDS搜索失败，状态码: {response.status}")
-                return None
-
-        except requests.RequestException as e:
-            logger.error(f"HTTP 请求错误: {e}")
-            return None
 
     def parse_opds_response(self, xml_data: str):
         '''解析 OPDS 搜索结果 XML 数据'''

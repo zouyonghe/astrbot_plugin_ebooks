@@ -8,7 +8,8 @@ import aiohttp
 from astrbot.api.all import *
 from astrbot.api.event.filter import *
 
-download_dir = "./downloads/"
+path = os.getcwd()
+download_dir = f"{path}/downloads/"
 os.makedirs(download_dir, exist_ok=True)
 
 
@@ -248,11 +249,16 @@ class OPDS(Star):
                         if content_disposition:
                             logger.info(f"Content-Disposition: {content_disposition}")
 
-                            # 提取 filename= 或 filename*=UTF-8'' 格式的内容
-                            file_name_match = re.search(r'filename\*?=(?:UTF-8\'\')?["\']?([^"\']+)', content_disposition)
+                            # 先检查是否有 filename*= 条目
+                            file_name_match = re.search(r'filename\*=(?:UTF-8\'\')?([^;]+)', content_disposition)
                             if file_name_match:
                                 file_name = file_name_match.group(1)
                                 file_name = unquote(file_name)  # 解码 URL 编码的文件名
+                            else:
+                                # 如果没有 filename*，则查找普通的 filename
+                                file_name_match = re.search(r'filename=["\']?([^;\']+)["\']?', content_disposition)
+                                if file_name_match:
+                                    file_name = file_name_match.group(1)
 
                         # 如果未获取到文件名，使用默认值
                         if not file_name or file_name.strip() == "":

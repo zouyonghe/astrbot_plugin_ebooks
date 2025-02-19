@@ -213,7 +213,7 @@ class OPDS(Star):
         '''随机推荐 n 本书籍'''
         try:
             # 调用 OPDS 搜索接口，默认搜索所有书籍
-            query = ""  # 空查询，可以调出完整书目
+            query = "*"  # 空查询，可以调出完整书目
             results = await self._search_opds(quote_plus(query))
 
             # 检查是否有书籍可供推荐

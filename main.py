@@ -1,6 +1,5 @@
 import aiohttp
-
-
+import xml.etree.ElementTree as ET
 from astrbot.api.all import *
 from astrbot.api.event.filter import *
 
@@ -15,11 +14,10 @@ class OPDS(Star):
     def opds(self):
         pass
 
-    # 注册指令的装饰器，用于搜索电子书
     @opds.command("search")
     async def search(self, event: AstrMessageEvent):
         '''搜索 OPDS 电子书目录'''
-        query = event.message_str.strip()  # 获取用户输入的查询字符串
+        query = event.message_str.strip()  # 获取用户输入的查询关键词
         if not query:
             yield event.plain_result("请输入搜索关键词。")
             return
@@ -29,10 +27,21 @@ class OPDS(Star):
             if not results:
                 yield event.plain_result("未找到相关的电子书。")
             else:
-                formatted_results = "\n".join(
-                    [f"{idx + 1}. {item['title']} - {item['link']}" for idx, item in enumerate(results)]
-                )
-                yield event.plain_result(f"搜索结果：\n{formatted_results}")
+
+                chain = [
+                    Plain("以下是电子书搜索结果："),
+                ]
+
+                for idx, item in enumerate(results):
+                    chain.append(
+                        Plain(f"\n{idx + 1}. {item['title']} by {item.get('authors', '未知作者')}\n")
+                    )
+                    if item.get("cover_link"):
+                        chain.append(Image.fromURL(item["cover_link"]))
+                    chain.append(Plain(f"描述: {item.get('summary', '暂无描述')}\n"))
+                    chain.append(Plain(f"下载链接: {item['download_link']}\n"))
+
+                yield event.chain_result(chain)
         except Exception as e:
             logger.error(f"OPDS搜索失败: {e}")
             yield event.plain_result("搜索过程中出现错误，请稍后重试。")
@@ -43,23 +52,90 @@ class OPDS(Star):
         username = self.config.get("opds_username")  # 从配置中获取用户名
         password = self.config.get("opds_password")  # 从配置中获取密码
 
-        opds_api_url = f"{opds_url}/opds/search/{query}"  # 根据实际路径修改
-
-        # 使用 aiohttp 的 Basic Authentication
-        auth = aiohttp.BasicAuth(username, password)
+        opds_api_url = f"{opds_url}/opds/search/{query}"  # 根据实际路径构造 API URL
+        auth = aiohttp.BasicAuth(username, password)  # 使用 Basic Authentication
 
         async with aiohttp.ClientSession(auth=auth) as session:
             async with session.get(opds_api_url) as response:
                 if response.status == 200:
-                    data = await response.json()
-                    # 解析 OPDS 搜索结果并返回
-                    return [
-                        {"title": item.get("title"), "link": item.get("link")}
-                        for item in data.get("entries", [])
-                    ]
+                    content_type = response.headers.get("Content-Type", "")
+                    if "application/atom+xml" in content_type:
+                        data = await response.text()
+                        return self.parse_opds_response(data)  # 调用解析方法
+                    else:
+                        logger.error(f"Unexpected content type: {content_type}")
+                        return None
                 else:
                     logger.error(f"OPDS搜索失败，状态码: {response.status}")
                     return None
+
+    def parse_opds_response(self, xml_data: str):
+        '''解析 OPDS 搜索结果 XML 数据'''
+        try:
+            root = ET.fromstring(xml_data)  # 把 XML 转换为元素树
+            namespace = {"default": "http://www.w3.org/2005/Atom"}  # 定义命名空间
+            entries = root.findall("default:entry", namespace)  # 查找所有 <entry> 节点
+
+            results = []
+            for entry in entries:
+                # 提取书籍标题
+                title_element = entry.find("default:title", namespace)
+                title = title_element.text if title_element is not None else "未知标题"
+
+                # 提取作者，多作者场景
+                authors = []
+                author_elements = entry.findall("default:author/default:name", namespace)
+                for author in author_elements:
+                    authors.append(author.text if author is not None else "未知作者")
+                authors = ", ".join(authors) if authors else "未知作者"
+
+                # 提取描述（<summary>）
+                summary_element = entry.find("default:summary", namespace)
+                summary = summary_element.text if summary_element is not None else "暂无描述"
+
+                # 提取出版日期（<published>）
+                published_element = entry.find("default:published", namespace)
+                published_date = published_element.text if published_element is not None else "未知出版日期"
+
+                # 提取语言（<dcterms:language>），需注意 namespace
+                lang_element = entry.find("default:dcterms:language", namespace)
+                language = lang_element.text if lang_element is not None else "未知语言"
+                # 提取图书封面链接（rel="http://opds-spec.org/image"）
+                cover_element = entry.find("default:link[@rel='http://opds-spec.org/image']", namespace)
+                cover_link = cover_element.attrib.get("href", "") if cover_element is not None else ""
+
+                # 提取图书缩略图链接（rel="http://opds-spec.org/image/thumbnail"）
+                thumbnail_element = entry.find("default:link[@rel='http://opds-spec.org/image/thumbnail']", namespace)
+                thumbnail_link = thumbnail_element.attrib.get("href", "") if thumbnail_element is not None else ""
+
+                # 提取下载链接及其格式（rel="http://opds-spec.org/acquisition"）
+                download_link = ""
+                file_type = ""
+                file_size = ""
+                acquisition_element = entry.find("default:link[@rel='http://opds-spec.org/acquisition']", namespace)
+                if acquisition_element is not None:
+                    download_link = acquisition_element.attrib.get("href", "")
+                    file_type = acquisition_element.attrib.get("type", "未知格式")
+                    file_size = acquisition_element.attrib.get("length", "未知大小")
+
+                # 构建结果
+                results.append({
+                    "title": title,
+                    "authors": authors,
+                    "summary": summary,
+                    "published_date": published_date,
+                    "language": language,
+                    "cover_link": cover_link,
+                    "thumbnail_link": thumbnail_link,
+                    "download_link": download_link,
+                    "file_type": file_type,
+                    "file_size": file_size
+                })
+
+            return results
+        except ET.ParseError as e:
+            logger.error(f"解析 OPDS 响应失败: {e}")
+            return None
 
     @opds.command("download")
     async def download(self, event: AstrMessageEvent, ebook_url: str = None):
@@ -71,19 +147,18 @@ class OPDS(Star):
         username = self.config.get("opds_username")
         password = self.config.get("opds_password")
 
-        # 使用 aiohttp 的 Basic Authentication
         auth = aiohttp.BasicAuth(username, password)
 
         try:
             async with aiohttp.ClientSession(auth=auth) as session:
                 async with session.get(ebook_url) as response:
                     if response.status == 200:
-                        # 保存到文件或者进一步处理内容
+                        # 保存下载的文件
                         file_name = ebook_url.split("/")[-1]
                         with open(f"./downloads/{file_name}", "wb") as file:
                             file.write(await response.read())
                         logger.info(f"电子书 {file_name} 下载完成。")
-                        file = File(name=file_name, file="./downloads/{file_name}")
+                        file = File(name=file_name, file=f"./downloads/{file_name}")
                         yield event.chain_result([file])
                     else:
                         yield event.plain_result(f"无法下载电子书，状态码: {response.status}")

@@ -24,9 +24,9 @@ class OPDS(Star):
             )
             if item.get("cover_link"):
                 chain.append(Image.fromURL(item["cover_link"]))
-            chain.append(Plain(f"作者: {item.get('authors', '未知作者')}"))
-            chain.append(Plain(f"描述: {item.get('summary', '暂无描述')}"))
-            chain.append(Plain(f"链接: {item['download_link']}"))
+            chain.append(Plain(f"\n作者: {item.get('authors', '未知作者')}"))
+            chain.append(Plain(f"\n描述: {item.get('summary', '暂无描述')}"))
+            chain.append(Plain(f"\n链接: {item['download_link']}"))
 
         if len(results) <= 3:
             yield event.chain_result(chain)
@@ -209,7 +209,7 @@ class OPDS(Star):
             
     @llm_tool("opds_search_books")
     async def search_books(self, event: AstrMessageEvent, query: str):
-        """Search books by keywords or title through OPDS.
+        """Search books by keywords or title through OPDS, only for searching but not for downloading.
 
         Args:
             query (string): The search keyword or title to find books in the OPDS catalog.

@@ -1,4 +1,4 @@
-from urllib.parse import quote_plus, urlparse
+from urllib.parse import quote_plus, urlparse, urljoin
 
 import aiohttp
 import xml.etree.ElementTree as ET
@@ -77,13 +77,10 @@ class OPDS(Star):
                     logger.error(f"OPDS搜索失败，状态码: {response.status}")
                     return None
 
-    def is_valid_url(self, url):
-        ''' 验证链接是否是有效的 URL '''
-        parsed = urlparse(url)
-        return bool(parsed.netloc) and bool(parsed.scheme)
-
     def parse_opds_response(self, xml_data: str):
         '''解析 OPDS 搜索结果 XML 数据'''
+        opds_url = self.config.get("opds_url", "http://127.0.0.1:8083")
+
         try:
             root = ET.fromstring(xml_data)  # 把 XML 转换为元素树
             namespace = {"default": "http://www.w3.org/2005/Atom"}  # 定义命名空间
@@ -113,32 +110,37 @@ class OPDS(Star):
                 # 提取语言（<dcterms:language>），需注意 namespace
                 lang_element = entry.find("default:dcterms:language", namespace)
                 language = lang_element.text if lang_element is not None else "未知语言"
+
                 # 提取图书封面链接（rel="http://opds-spec.org/image"）
                 cover_element = entry.find("default:link[@rel='http://opds-spec.org/image']", namespace)
-                cover_link = cover_element.attrib.get("href", "") if cover_element is not None else ""
-                if not self.is_valid_url(cover_link):
-                    logger.warning(f"无效的封面链接: {cover_link}")
+                cover_suffix = cover_element.attrib.get("href", "")
+                if cover_suffix:
+                    cover_link = urljoin(opds_url, cover_suffix)
+                else:
                     cover_link = ""
 
                 # 提取图书缩略图链接（rel="http://opds-spec.org/image/thumbnail"）
                 thumbnail_element = entry.find("default:link[@rel='http://opds-spec.org/image/thumbnail']", namespace)
-                thumbnail_link = thumbnail_element.attrib.get("href", "") if thumbnail_element is not None else ""
-                if not self.is_valid_url(thumbnail_link):
-                    logger.warning(f"无效的缩略图链接: {thumbnail_link}")
+                thumbnail_suffix = thumbnail_element.attrib.get("href", "")
+                if thumbnail_suffix:
+                    thumbnail_link = urljoin(opds_url, thumbnail_suffix)
+                else:
                     thumbnail_link = ""
 
                 # 提取下载链接及其格式（rel="http://opds-spec.org/acquisition"）
-                download_link = ""
-                file_type = ""
-                file_size = ""
                 acquisition_element = entry.find("default:link[@rel='http://opds-spec.org/acquisition']", namespace)
                 if acquisition_element is not None:
-                    download_link = acquisition_element.attrib.get("href", "")
+                    download_suffix = acquisition_element.attrib.get("href", "")
+                    if download_suffix:
+                        download_link = urljoin(opds_url, download_suffix)
+                    else:
+                        download_link = ""
                     file_type = acquisition_element.attrib.get("type", "未知格式")
                     file_size = acquisition_element.attrib.get("length", "未知大小")
-                if not self.is_valid_url(download_link):
-                    logger.warning(f"无效的下载链接: {download_link}")
+                else:
                     download_link = ""
+                    file_type = "未知格式"
+                    file_size = "未知格式"
 
                 # 构建结果
                 results.append({

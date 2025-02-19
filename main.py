@@ -165,13 +165,13 @@ class OPDS(Star):
         #     return None
         try:
             # 打印原始 XML 数据（调试用）
-            print("原始 XML 数据:", xml_data[:500])
+            logger.error("原始 XML 数据:", xml_data[:500])
 
             # 将 XML 数据转为元素树结构
             root = ET.fromstring(xml_data)
             namespace = {"default": "http://www.w3.org/2005/Atom"}  # 定义命名空间
             entries = root.findall("default:entry", namespace)  # 查找所有 <entry> 节点
-            print(f"解析到的 entries 数量: {len(entries)}")  # 调试用日志
+            logger.error(f"解析到的 entries 数量: {len(entries)}")  # 调试用日志
 
             results = []
             for entry in entries:
@@ -212,10 +212,10 @@ class OPDS(Star):
             return results  # 返回结构化的结果
 
         except ET.ParseError as e:
-            print(f"XML 解析失败: {e}")
+            logger.error(f"XML 解析失败: {e}")
             return []
         except Exception as e:
-            print(f"解析逻辑出错: {e}")
+            logger.error(f"解析逻辑出错: {e}")
             raise
 
     @opds.command("download")

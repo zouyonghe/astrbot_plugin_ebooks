@@ -1,3 +1,4 @@
+import random
 import re
 import xml.etree.ElementTree as ET
 from urllib.parse import quote_plus, urljoin, unquote
@@ -206,7 +207,36 @@ class OPDS(Star):
         except Exception as e:
             logger.error(f"下载失败: {e}")
             yield event.plain_result("下载过程中出现错误，请稍后重试。")
-            
+
+    @opds.command("recommend")
+    async def recommend(self, event: AstrMessageEvent, n: int):
+        '''随机推荐 n 本书籍'''
+        try:
+            # 调用 OPDS 搜索接口，默认搜索所有书籍
+            query = ""  # 空查询，可以调出完整书目
+            results = await self._search_opds(quote_plus(query))
+
+            # 检查是否有书籍可供推荐
+            if not results:
+                yield event.plain_result("未找到任何可推荐的电子书。")
+                return
+
+            # 限制推荐数量，防止超出实际书籍数量
+            if n > len(results):
+                n = len(results)
+
+            # 随机选择 n 本书籍
+            recommended_books = random.sample(results, n)
+
+            # 显示推荐书籍
+            yield event.plain_result(f"如下是随机推荐的 {n} 本电子书：")
+            async for result in self._show_result(event, recommended_books):
+                yield result
+
+        except Exception as e:
+            logger.error(f"推荐书籍时发生错误: {e}")
+            yield event.plain_result("推荐随机书籍时出现错误，请稍后重试。")
+
     @llm_tool("opds_search_books")
     async def search_books(self, event: AstrMessageEvent, query: str):
         """Search books by keywords or title through OPDS, but it cannot be used for downloading.
@@ -249,3 +279,14 @@ class OPDS(Star):
         except Exception as e:
             logger.error(f"处理书籍接收过程中出现错误: {e}")
             yield event.plain_result("处理请求时发生错误，请稍后重试或检查输入是否正确。")
+
+    @llm_tool("opds_recommend_books")
+    async def recommend_books(self, event: AstrMessageEvent, n: int = 5):
+        """Randomly recommend n books from the OPDS catalog.
+    
+        Args:
+            n (int): Number of books to recommend (default is 5).
+        """
+        async for result in self.recommend(event, n):
+            yield result
+

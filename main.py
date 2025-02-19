@@ -18,14 +18,14 @@ class OPDS(Star):
         pass
 
     @opds.command("search")
-    async def search(self, event: AstrMessageEvent, query: str):
+    async def search(self, event: AstrMessageEvent, query: str=None):
         '''搜索 OPDS 电子书目录'''
         if not query:
             yield event.plain_result("请输入搜索关键词。")
             return
 
         try:
-            results = await self.search_opds(query)  # 调用搜索方法
+            results = await self.search_opds(query.strip())  # 调用搜索方法
             if not results:
                 yield event.plain_result("未找到相关的电子书。")
             else:
@@ -54,12 +54,12 @@ class OPDS(Star):
         username = self.config.get("opds_username")  # 从配置中获取用户名
         password = self.config.get("opds_password")  # 从配置中获取密码
 
-        opds_api_url = f"{opds_url}/opds/search/{query}"  # 根据实际路径构造 API URL
-        logger.error(f"OPDS API URL: {opds_api_url}")
+        search_url = f"{opds_url}/opds/search/{query}"  # 根据实际路径构造 API URL
+        logger.error(f"SEARCH URL: {search_url}")
         auth = aiohttp.BasicAuth(username, password)  # 使用 Basic Authentication
 
         async with aiohttp.ClientSession(auth=auth) as session:
-            async with session.get(opds_api_url) as response:
+            async with session.get(search_url) as response:
                 if response.status == 200:
                     content_type = response.headers.get("Content-Type", "")
                     if "application/atom+xml" in content_type:

@@ -59,10 +59,10 @@ class OPDS(Star):
         username = self.config.get("opds_username")  # 从配置中获取用户名
         password = self.config.get("opds_password")  # 从配置中获取密码
 
-        search_url = f"{opds_url}/opds/search/{query}"  # 根据实际路径构造 API URL
+        search_url = "http://192.168.50.20:8083/search/python"#f"{opds_url}/opds/search/{query}"  # 根据实际路径构造 API URL
         auth = aiohttp.BasicAuth(username, password)  # 使用 Basic Authentication
 
-        async with aiohttp.ClientSession() as session:
+        async with aiohttp.ClientSession(auth=auth) as session:
             async with session.get(search_url) as response:
                 if response.status == 200:
                     content_type = response.headers.get("Content-Type", "")

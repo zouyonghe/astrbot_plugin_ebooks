@@ -166,9 +166,9 @@ class OPDS(Star):
             logger.error(f"解析 OPDS 响应失败: {e}")
             return None
 
-    @opds.command("receive")
-    async def receive(self, event: AstrMessageEvent, ebook_url: str = None):
-        '''通过 OPDS 协议接收电子书'''
+    @opds.command("download")
+    async def download(self, event: AstrMessageEvent, ebook_url: str = None):
+        '''通过 OPDS 协议下载电子书'''
         if not ebook_url:
             yield event.plain_result("请输入电子书的下载链接。")
             return
@@ -220,12 +220,12 @@ class OPDS(Star):
         async for result in self.search(event, query):
             yield result
 
-    @llm_tool("opds_receive_book")
-    async def receive_book(self, event: AstrMessageEvent, book_identifier: str):
-        """Send a book to the user based on a precise name or URL.
+    @llm_tool("opds_download_book")
+    async def download_book(self, event: AstrMessageEvent, book_identifier: str):
+        """Download a book by on a precise name or URL.
     
         Args:
-            book_identifier (string): The exact book name or URL to locate and send the book.
+            book_identifier (string): The book name or URL of the book.
         """
         try:
             ebook_url = ""

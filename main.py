@@ -40,8 +40,8 @@ class OPDS(Star):
     async def search_opds(self, query: str):
         '''调用 OPDS 目录 API 进行电子书搜索'''
         opds_url = self.config.get("opds_url", "http://127.0.0.1:8083")
-        username = self.config.get("username")  # 从配置中获取用户名
-        password = self.config.get("password")  # 从配置中获取密码
+        username = self.config.get("opds_username")  # 从配置中获取用户名
+        password = self.config.get("opds_password")  # 从配置中获取密码
 
         opds_api_url = f"{opds_url}/opds/search/{query}"  # 根据实际路径修改
 

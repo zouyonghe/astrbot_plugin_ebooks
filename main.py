@@ -243,26 +243,26 @@ class OPDS(Star):
                 async with session.get(ebook_url) as response:
                     if response.status == 200:
                         # 从 Content-Disposition 提取文件名
-                        content_disposition = response.headers.get("Content-Disposition")
-                        file_name = None
-
-                        if content_disposition:
-                            logger.info(f"Content-Disposition: {content_disposition}")
-
-                            # 先检查是否有 filename*= 条目
-                            file_name_match = re.search(r'filename\*=(?:UTF-8\'\')?([^;]+)', content_disposition)
-                            if file_name_match:
-                                file_name = file_name_match.group(1)
-                                file_name = unquote(file_name)  # 解码 URL 编码的文件名
-                            else:
-                                # 如果没有 filename*，则查找普通的 filename
-                                file_name_match = re.search(r'filename=["\']?([^;\']+)["\']?', content_disposition)
-                                if file_name_match:
-                                    file_name = file_name_match.group(1)
-
-                        # 如果未获取到文件名，使用默认值
-                        if not file_name or file_name.strip() == "":
-                            file_name = f"file_{int(time.time())}.epub"
+                        # content_disposition = response.headers.get("Content-Disposition")
+                        # file_name = None
+                        #
+                        # if content_disposition:
+                        #     logger.info(f"Content-Disposition: {content_disposition}")
+                        #
+                        #     # 先检查是否有 filename*= 条目
+                        #     file_name_match = re.search(r'filename\*=(?:UTF-8\'\')?([^;]+)', content_disposition)
+                        #     if file_name_match:
+                        #         file_name = file_name_match.group(1)
+                        #         file_name = unquote(file_name)  # 解码 URL 编码的文件名
+                        #     else:
+                        #         # 如果没有 filename*，则查找普通的 filename
+                        #         file_name_match = re.search(r'filename=["\']?([^;\']+)["\']?', content_disposition)
+                        #         if file_name_match:
+                        #             file_name = file_name_match.group(1)
+                        #
+                        # # 如果未获取到文件名，使用默认值
+                        # if not file_name or file_name.strip() == "":
+                        #     file_name = f"file_{int(time.time())}.epub"
 
                         # # 确保文件名有效
                         # file_path = os.path.join(download_dir, file_name)
@@ -274,7 +274,7 @@ class OPDS(Star):
                         # logger.info(f"电子书 {file_name} 下载完成，路径: {file_path}")
 
                         # 发送文件到用户
-                        file = File(name=file_name, file=ebook_url)
+                        file = File(file=ebook_url)
                         yield event.chain_result([file])
 
                         # # 删除下载的文件

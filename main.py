@@ -20,12 +20,13 @@ class OPDS(Star):
         ]
         for idx, item in enumerate(results):
             chain.append(
-                Plain(f"\n{idx + 1}. {item['title']} by {item.get('authors', '未知作者')}\n")
+                Plain(f"\n{idx + 1}. {item['title']}")
             )
             if item.get("cover_link"):
                 chain.append(Image.fromURL(item["cover_link"]))
-            chain.append(Plain(f"描述: {item.get('summary', '暂无描述')}\n"))
-            chain.append(Plain(f"下载链接: {item['download_link']}\n"))
+            chain.append(Plain(f"作者: {item.get('authors', '未知作者')}"))
+            chain.append(Plain(f"描述: {item.get('summary', '暂无描述')}"))
+            chain.append(Plain(f"链接: {item['download_link']}"))
 
         if len(results) <= 3:
             yield event.chain_result(chain)
@@ -62,13 +63,9 @@ class OPDS(Star):
     async def _search_opds(self, query: str):
         '''调用 OPDS 目录 API 进行电子书搜索'''
         opds_url = self.config.get("opds_url", "http://127.0.0.1:8083")
-        username = self.config.get("opds_username")  # 从配置中获取用户名
-        password = self.config.get("opds_password")  # 从配置中获取密码
-
         search_url = f"{opds_url}/opds/search/{query}"  # 根据实际路径构造 API URL
-        auth = aiohttp.BasicAuth(username, password)  # 使用 Basic Authentication
 
-        async with aiohttp.ClientSession(auth=auth) as session:
+        async with aiohttp.ClientSession() as session:
             async with session.get(search_url) as response:
                 if response.status == 200:
                     content_type = response.headers.get("Content-Type", "")

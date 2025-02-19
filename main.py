@@ -1,9 +1,7 @@
-from urllib.parse import quote_plus, urlparse, urljoin
+import xml.etree.ElementTree as ET
+from urllib.parse import quote_plus, urljoin
 
 import aiohttp
-import xml.etree.ElementTree as ET
-
-import requests
 
 from astrbot.api.all import *
 from astrbot.api.event.filter import *
@@ -113,7 +111,7 @@ class OPDS(Star):
 
                 # 提取图书封面链接（rel="http://opds-spec.org/image"）
                 cover_element = entry.find("default:link[@rel='http://opds-spec.org/image']", namespace)
-                cover_suffix = cover_element.attrib.get("href", "")
+                cover_suffix = cover_element.attrib.get("href", "") if cover_element is not None else ""
                 if cover_suffix:
                     cover_link = urljoin(opds_url, cover_suffix)
                 else:
@@ -121,7 +119,7 @@ class OPDS(Star):
 
                 # 提取图书缩略图链接（rel="http://opds-spec.org/image/thumbnail"）
                 thumbnail_element = entry.find("default:link[@rel='http://opds-spec.org/image/thumbnail']", namespace)
-                thumbnail_suffix = thumbnail_element.attrib.get("href", "")
+                thumbnail_suffix = thumbnail_element.attrib.get("href", "") if thumbnail_element is not None else ""
                 if thumbnail_suffix:
                     thumbnail_link = urljoin(opds_url, thumbnail_suffix)
                 else:
@@ -130,7 +128,7 @@ class OPDS(Star):
                 # 提取下载链接及其格式（rel="http://opds-spec.org/acquisition"）
                 acquisition_element = entry.find("default:link[@rel='http://opds-spec.org/acquisition']", namespace)
                 if acquisition_element is not None:
-                    download_suffix = acquisition_element.attrib.get("href", "")
+                    download_suffix = acquisition_element.attrib.get("href", "") if acquisition_element is not None else ""
                     if download_suffix:
                         download_link = urljoin(opds_url, download_suffix)
                     else:

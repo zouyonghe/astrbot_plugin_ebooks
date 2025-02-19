@@ -264,25 +264,25 @@ class OPDS(Star):
                         if not file_name or file_name.strip() == "":
                             file_name = f"file_{int(time.time())}.epub"
 
-                        # 确保文件名有效
-                        file_path = os.path.join(download_dir, file_name)
-
-                        # 保存文件到本地
-                        with open(file_path, "wb") as file:
-                            file.write(await response.read())
-
-                        logger.info(f"电子书 {file_name} 下载完成，路径: {file_path}")
+                        # # 确保文件名有效
+                        # file_path = os.path.join(download_dir, file_name)
+                        #
+                        # # 保存文件到本地
+                        # with open(file_path, "wb") as file:
+                        #     file.write(await response.read())
+                        #
+                        # logger.info(f"电子书 {file_name} 下载完成，路径: {file_path}")
 
                         # 发送文件到用户
-                        file = File(name=file_name, file=file_path)
+                        file = File(name=file_name, file=ebook_url)
                         yield event.chain_result([file])
 
-                        # 删除下载的文件
-                        try:
-                            os.remove(file_path)
-                            logger.info(f"已成功删除文件: {file_path}")
-                        except OSError as e:
-                            logger.error(f"删除文件 {file_path} 时出错: {e}")
+                        # # 删除下载的文件
+                        # try:
+                        #     os.remove(file_path)
+                        #     logger.info(f"已成功删除文件: {file_path}")
+                        # except OSError as e:
+                        #     logger.error(f"删除文件 {file_path} 时出错: {e}")
 
                     else:
                         yield event.plain_result(f"无法下载电子书，状态码: {response.status}")

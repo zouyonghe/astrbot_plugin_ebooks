@@ -1,3 +1,5 @@
+import re
+import time
 import xml.etree.ElementTree as ET
 from urllib.parse import quote_plus, urljoin
 
@@ -35,7 +37,6 @@ class OPDS(Star):
                 chain = [
                     Plain("以下是电子书搜索结果："),
                 ]
-
                 for idx, item in enumerate(results):
                     chain.append(
                         Plain(f"\n{idx + 1}. {item['title']} by {item.get('authors', '未知作者')}\n")
@@ -45,13 +46,15 @@ class OPDS(Star):
                     chain.append(Plain(f"描述: {item.get('summary', '暂无描述')}\n"))
                     chain.append(Plain(f"下载链接: {item['download_link']}\n"))
 
-                node = Node(
-                    uin=event.get_self_id(),
-                    name="OPDS",
-                    content=chain
-                )
-
-                yield event.chain_result([node])
+                if len(results) <= 3:
+                    yield event.chain_result(chain)
+                else:
+                    node = Node(
+                        uin=event.get_self_id(),
+                        name="OPDS",
+                        content=chain
+                    )
+                    yield event.chain_result([node])
         except Exception as e:
             logger.error(f"OPDS搜索失败: {e}")
             yield event.plain_result("搜索过程中出现错误，请稍后重试。")
@@ -163,7 +166,6 @@ class OPDS(Star):
             logger.error(f"解析 OPDS 响应失败: {e}")
             return None
 
-
     @opds.command("download")
     async def download(self, event: AstrMessageEvent, ebook_url: str = None):
         '''下载 OPDS 提供的电子书'''
@@ -180,15 +182,42 @@ class OPDS(Star):
             async with aiohttp.ClientSession(auth=auth) as session:
                 async with session.get(ebook_url) as response:
                     if response.status == 200:
-                        # 保存下载的文件
-                        file_name = ebook_url.split("/")[-1]
-                        with open(f"{download_dir}{file_name}", "wb") as file:
+                        # 从 Content-Disposition 中获取文件名
+                        content_disposition = response.headers.get("Content-Disposition")
+                        if content_disposition:
+                            # 使用正则提取 filename
+                            file_name_match = re.search(r'filename="(.+?)"', content_disposition)
+                            file_name = file_name_match.group(1) if file_name_match else None
+                        else:
+                            # 如果 Content-Disposition 没有提供 filename，使用默认值
+                            file_name = f"file_{int(time.time())}.epub"
+
+                        # 确保文件名有效
+                        if not file_name or file_name.strip() == "":
+                            file_name = f"file_{int(time.time())}.epub"
+
+                        # 保存完整路径
+                        file_path = os.path.join(download_dir, file_name)
+
+                        # 保存文件到本地
+                        with open(file_path, "wb") as file:
                             file.write(await response.read())
+
                         logger.info(f"电子书 {file_name} 下载完成。")
-                        file = File(name=file_name, file=f"./downloads/{file_name}")
+
+                        # 返回下载后的文件信息
+                        file = File(name=file_name, file=file_path)
                         yield event.chain_result([file])
+
+                        # 删除下载的文件
+                        try:
+                            os.remove(file_path)
+                            logger.info(f"已成功删除文件: {file_path}")
+                        except OSError as e:
+                            logger.error(f"删除文件 {file_path} 时出错: {e}")
                     else:
                         yield event.plain_result(f"无法下载电子书，状态码: {response.status}")
         except Exception as e:
             logger.error(f"下载失败: {e}")
             yield event.plain_result("下载过程中出现错误，请稍后重试。")
+

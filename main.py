@@ -72,6 +72,7 @@ class OPDS(Star):
     def parse_opds_response(self, xml_data: str):
         '''解析 OPDS 搜索结果 XML 数据'''
         try:
+            logger.error(f"XML data: {xml_data}")
             root = ET.fromstring(xml_data)  # 把 XML 转换为元素树
             namespace = {"default": "http://www.w3.org/2005/Atom"}  # 定义命名空间
             entries = root.findall("default:entry", namespace)  # 查找所有 <entry> 节点

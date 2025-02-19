@@ -15,9 +15,9 @@ class OPDS(Star):
         super().__init__(context)
         self.config = config
 
-    async def _show_result(self, event: AstrMessageEvent, results: list):
+    async def _show_result(self, event: AstrMessageEvent, results: list, guidance: str = "以下是电子书搜索结果："):
         chain = [
-            Plain("以下是电子书搜索结果："),
+            Plain(guidance),
         ]
         for idx, item in enumerate(results):
             chain.append(
@@ -229,8 +229,8 @@ class OPDS(Star):
             recommended_books = random.sample(results, n)
 
             # 显示推荐书籍
-            yield event.plain_result(f"如下是随机推荐的 {n} 本电子书：")
-            async for result in self._show_result(event, recommended_books):
+            guidance = f"如下是随机推荐的 {n} 本电子书："
+            async for result in self._show_result(event, recommended_books, guidance):
                 yield result
 
         except Exception as e:

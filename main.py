@@ -1,3 +1,5 @@
+from urllib.parse import quote_plus
+
 import aiohttp
 import xml.etree.ElementTree as ET
 from astrbot.api.all import *
@@ -25,7 +27,7 @@ class OPDS(Star):
             return
 
         try:
-            results = await self.search_opds(query)  # 调用搜索方法
+            results = await self.search_opds(quote_plus(query))  # 调用搜索方法
             if not results:
                 yield event.plain_result("未找到相关的电子书。")
             else:
@@ -55,8 +57,6 @@ class OPDS(Star):
         password = self.config.get("opds_password")  # 从配置中获取密码
 
         search_url = f"{opds_url}/opds/search/{query}"  # 根据实际路径构造 API URL
-        logger.error(f"{search_url}")
-        logger.error(f"OPDS API URL: {repr(search_url)}")
         auth = aiohttp.BasicAuth(username, password)  # 使用 Basic Authentication
 
         async with aiohttp.ClientSession(auth=auth) as session:

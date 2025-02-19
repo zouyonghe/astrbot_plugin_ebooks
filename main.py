@@ -98,10 +98,80 @@ class OPDS(Star):
 
     def parse_opds_response(self, xml_data: str):
         '''解析 OPDS 搜索结果 XML 数据'''
+        # try:
+        #     root = ET.fromstring(xml_data)  # 把 XML 转换为元素树
+        #     namespace = {"default": "http://www.w3.org/2005/Atom"}  # 定义命名空间
+        #     entries = root.findall("default:entry", namespace)  # 查找所有 <entry> 节点
+        #
+        #     results = []
+        #     for entry in entries:
+        #         # 提取书籍标题
+        #         title_element = entry.find("default:title", namespace)
+        #         title = title_element.text if title_element is not None else "未知标题"
+        #
+        #         # 提取作者，多作者场景
+        #         authors = []
+        #         author_elements = entry.findall("default:author/default:name", namespace)
+        #         for author in author_elements:
+        #             authors.append(author.text if author is not None else "未知作者")
+        #         authors = ", ".join(authors) if authors else "未知作者"
+        #
+        #         # 提取描述（<summary>）
+        #         summary_element = entry.find("default:summary", namespace)
+        #         summary = summary_element.text if summary_element is not None else "暂无描述"
+        #
+        #         # 提取出版日期（<published>）
+        #         published_element = entry.find("default:published", namespace)
+        #         published_date = published_element.text if published_element is not None else "未知出版日期"
+        #
+        #         # 提取语言（<dcterms:language>），需注意 namespace
+        #         lang_element = entry.find("default:dcterms:language", namespace)
+        #         language = lang_element.text if lang_element is not None else "未知语言"
+        #         # 提取图书封面链接（rel="http://opds-spec.org/image"）
+        #         cover_element = entry.find("default:link[@rel='http://opds-spec.org/image']", namespace)
+        #         cover_link = cover_element.attrib.get("href", "") if cover_element is not None else ""
+        #
+        #         # 提取图书缩略图链接（rel="http://opds-spec.org/image/thumbnail"）
+        #         thumbnail_element = entry.find("default:link[@rel='http://opds-spec.org/image/thumbnail']", namespace)
+        #         thumbnail_link = thumbnail_element.attrib.get("href", "") if thumbnail_element is not None else ""
+        #
+        #         # 提取下载链接及其格式（rel="http://opds-spec.org/acquisition"）
+        #         download_link = ""
+        #         file_type = ""
+        #         file_size = ""
+        #         acquisition_element = entry.find("default:link[@rel='http://opds-spec.org/acquisition']", namespace)
+        #         if acquisition_element is not None:
+        #             download_link = acquisition_element.attrib.get("href", "")
+        #             file_type = acquisition_element.attrib.get("type", "未知格式")
+        #             file_size = acquisition_element.attrib.get("length", "未知大小")
+        #
+        #         # 构建结果
+        #         results.append({
+        #             "title": title,
+        #             "authors": authors,
+        #             "summary": summary,
+        #             "published_date": published_date,
+        #             "language": language,
+        #             "cover_link": cover_link,
+        #             "thumbnail_link": thumbnail_link,
+        #             "download_link": download_link,
+        #             "file_type": file_type,
+        #             "file_size": file_size
+        #         })
+        #
+        #     return results
+        # except ET.ParseError as e:
+        #     logger.error(f"解析 OPDS 响应失败: {e}")
+        #     return None
         try:
-            root = ET.fromstring(xml_data)  # 把 XML 转换为元素树
+            # 打印原始 XML 数据（调试用）
+            print("原始 XML 数据:", xml_data[:500])
+
+            # 将 XML 数据转为元素树结构
+            root = ET.fromstring(xml_data)
             namespace = {"default": "http://www.w3.org/2005/Atom"}  # 定义命名空间
             entries = root.findall("default:entry", namespace)  # 查找所有 <entry> 节点
+            print(f"解析到的 entries 数量: {len(entries)}")  # 调试用日志
 
             results = []
             for entry in entries:
@@ -109,7 +179,7 @@ class OPDS(Star):
                 title_element = entry.find("default:title", namespace)
                 title = title_element.text if title_element is not None else "未知标题"
 
-                # 提取作者，多作者场景
+                # 提取作者
                 authors = []
                 author_elements = entry.findall("default:author/default:name", namespace)
                 for author in author_elements:
@@ -120,49 +190,33 @@ class OPDS(Star):
                 summary_element = entry.find("default:summary", namespace)
                 summary = summary_element.text if summary_element is not None else "暂无描述"
 
-                # 提取出版日期（<published>）
-                published_element = entry.find("default:published", namespace)
-                published_date = published_element.text if published_element is not None else "未知出版日期"
-
-                # 提取语言（<dcterms:language>），需注意 namespace
-                lang_element = entry.find("default:dcterms:language", namespace)
-                language = lang_element.text if lang_element is not None else "未知语言"
                 # 提取图书封面链接（rel="http://opds-spec.org/image"）
                 cover_element = entry.find("default:link[@rel='http://opds-spec.org/image']", namespace)
                 cover_link = cover_element.attrib.get("href", "") if cover_element is not None else ""
 
-                # 提取图书缩略图链接（rel="http://opds-spec.org/image/thumbnail"）
-                thumbnail_element = entry.find("default:link[@rel='http://opds-spec.org/image/thumbnail']", namespace)
-                thumbnail_link = thumbnail_element.attrib.get("href", "") if thumbnail_element is not None else ""
-
                 # 提取下载链接及其格式（rel="http://opds-spec.org/acquisition"）
                 download_link = ""
-                file_type = ""
-                file_size = ""
                 acquisition_element = entry.find("default:link[@rel='http://opds-spec.org/acquisition']", namespace)
                 if acquisition_element is not None:
                     download_link = acquisition_element.attrib.get("href", "")
-                    file_type = acquisition_element.attrib.get("type", "未知格式")
-                    file_size = acquisition_element.attrib.get("length", "未知大小")
 
                 # 构建结果
                 results.append({
                     "title": title,
                     "authors": authors,
                     "summary": summary,
-                    "published_date": published_date,
-                    "language": language,
                     "cover_link": cover_link,
-                    "thumbnail_link": thumbnail_link,
                     "download_link": download_link,
-                    "file_type": file_type,
-                    "file_size": file_size
                 })
 
-            return results
+            return results  # 返回结构化的结果
+
         except ET.ParseError as e:
-            logger.error(f"解析 OPDS 响应失败: {e}")
-            return None
+            print(f"XML 解析失败: {e}")
+            return []
+        except Exception as e:
+            print(f"解析逻辑出错: {e}")
+            raise
 
     @opds.command("download")
     async def download(self, event: AstrMessageEvent, ebook_url: str = None):

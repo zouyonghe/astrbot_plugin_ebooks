@@ -285,7 +285,7 @@ class OPDS(Star):
         """Randomly recommend n books from the OPDS catalog.
     
         Args:
-            n (str): Number of books to recommend (default is 5).
+            n (string): Number of books to recommend (default is 5).
         """
         async for result in self.recommend(event, int(n)):
             yield result

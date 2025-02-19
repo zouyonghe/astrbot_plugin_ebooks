@@ -32,7 +32,6 @@ class OPDS(Star):
             if not results:
                 yield event.plain_result("未找到相关的电子书。")
             else:
-
                 chain = [
                     Plain("以下是电子书搜索结果："),
                 ]
@@ -46,7 +45,13 @@ class OPDS(Star):
                     chain.append(Plain(f"描述: {item.get('summary', '暂无描述')}\n"))
                     chain.append(Plain(f"下载链接: {item['download_link']}\n"))
 
-                yield event.chain_result(chain)
+                node = Node(
+                    uin=event.get_self_id(),
+                    name="OPDS",
+                    content=chain
+                )
+
+                yield event.chain_result([node])
         except Exception as e:
             logger.error(f"OPDS搜索失败: {e}")
             yield event.plain_result("搜索过程中出现错误，请稍后重试。")
@@ -66,7 +71,6 @@ class OPDS(Star):
                     content_type = response.headers.get("Content-Type", "")
                     if "application/atom+xml" in content_type:
                         data = await response.text()
-                        logger.error("data:" + data)
                         return self.parse_opds_response(data)  # 调用解析方法
                     else:
                         logger.error(f"Unexpected content type: {content_type}")

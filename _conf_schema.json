@@ -1,0 +1,20 @@
+{
+    "opds_url": {
+        "type": "string",
+        "description": "OPDS 协议地址",
+        "default": "http://127.0.0.1:8083",
+        "hint": "例如在同主机安装的 calibre-web，它的默认 OPDS 地址为 127.0.0.1:8083"
+    },
+    "opds_username": {
+        "type": "string",
+        "description": "OPDS 用户名",
+        "default": "",
+        "hint": "calibre-web的用户名"
+    },
+    "opds_password": {
+        "type": "string",
+        "description": "OPDS 密码",
+        "default": "",
+        "hint": "calibre-web的密码"
+    }
+}

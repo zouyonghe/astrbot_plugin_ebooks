@@ -8,12 +8,7 @@ import aiohttp
 from astrbot.api.all import *
 from astrbot.api.event.filter import *
 
-path = os.getcwd()
-download_dir = f"{path}/downloads/"
-os.makedirs(download_dir, exist_ok=True)
-
-
-@register("opds", "Your Name", "一个基于OPDS的电子书搜索和下载插件", "0.0.1", "repo url")
+@register("opds", "buding", "一个基于OPDS的电子书搜索和下载插件", "1.0.0", "https://github.com/zouyonghe/astrbot_plugin_opds")
 class OPDS(Star):
     def __init__(self, context: Context, config: dict):
         super().__init__(context)
@@ -167,62 +162,6 @@ class OPDS(Star):
             logger.error(f"解析 OPDS 响应失败: {e}")
             return None
 
-    # @opds.command("download")
-    # async def download(self, event: AstrMessageEvent, ebook_url: str = None):
-    #     '''下载 OPDS 提供的电子书'''
-    #     if not ebook_url:
-    #         yield event.plain_result("请输入电子书的下载链接。")
-    #         return
-    #
-    #     username = self.config.get("opds_username")
-    #     password = self.config.get("opds_password")
-    #
-    #     auth = aiohttp.BasicAuth(username, password)
-    #
-    #     try:
-    #         async with aiohttp.ClientSession(auth=auth) as session:
-    #             async with session.get(ebook_url) as response:
-    #                 if response.status == 200:
-    #                     # 从 Content-Disposition 中获取文件名
-    #                     content_disposition = response.headers.get("Content-Disposition")
-    #                     if content_disposition:
-    #                         # 使用正则提取 filename
-    #                         file_name_match = re.search(r'filename="(.+?)"', content_disposition)
-    #                         file_name = file_name_match.group(1) if file_name_match else None
-    #                     else:
-    #                         # 如果 Content-Disposition 没有提供 filename，使用默认值
-    #                         file_name = f"file_{int(time.time())}.epub"
-    #
-    #                     # 确保文件名有效
-    #                     if not file_name or file_name.strip() == "":
-    #                         file_name = f"file_{int(time.time())}.epub"
-    #
-    #                     # 保存完整路径
-    #                     file_path = os.path.join(download_dir, file_name)
-    #
-    #                     # 保存文件到本地
-    #                     with open(file_path, "wb") as file:
-    #                         file.write(await response.read())
-    #
-    #                     logger.info(f"电子书 {file_name} 下载完成。")
-    #
-    #                     # 返回下载后的文件信息
-    #                     file = File(name=file_name, file=file_path)
-    #                     yield event.chain_result([file])
-    #
-    #                     # 删除下载的文件
-    #                     try:
-    #                         os.remove(file_path)
-    #                         logger.info(f"已成功删除文件: {file_path}")
-    #                     except OSError as e:
-    #                         logger.error(f"删除文件 {file_path} 时出错: {e}")
-    #                 else:
-    #                     yield event.plain_result(f"无法下载电子书，状态码: {response.status}")
-    #     except Exception as e:
-    #         logger.error(f"下载失败: {e}")
-    #         yield event.plain_result("下载过程中出现错误，请稍后重试。")
-    #
-
     @opds.command("download")
     async def download(self, event: AstrMessageEvent, ebook_url: str = None):
         '''下载 OPDS 提供的电子书'''
@@ -236,54 +175,34 @@ class OPDS(Star):
         auth = aiohttp.BasicAuth(username, password)
 
         try:
-            # 创建下载目录
-            os.makedirs(download_dir, exist_ok=True)
-
             async with aiohttp.ClientSession(auth=auth) as session:
                 async with session.get(ebook_url) as response:
                     if response.status == 200:
                         # 从 Content-Disposition 提取文件名
-                        # content_disposition = response.headers.get("Content-Disposition")
-                        # file_name = None
-                        #
-                        # if content_disposition:
-                        #     logger.info(f"Content-Disposition: {content_disposition}")
-                        #
-                        #     # 先检查是否有 filename*= 条目
-                        #     file_name_match = re.search(r'filename\*=(?:UTF-8\'\')?([^;]+)', content_disposition)
-                        #     if file_name_match:
-                        #         file_name = file_name_match.group(1)
-                        #         file_name = unquote(file_name)  # 解码 URL 编码的文件名
-                        #     else:
-                        #         # 如果没有 filename*，则查找普通的 filename
-                        #         file_name_match = re.search(r'filename=["\']?([^;\']+)["\']?', content_disposition)
-                        #         if file_name_match:
-                        #             file_name = file_name_match.group(1)
-                        #
-                        # # 如果未获取到文件名，使用默认值
-                        # if not file_name or file_name.strip() == "":
-                        #     file_name = f"file_{int(time.time())}.epub"
+                        content_disposition = response.headers.get("Content-Disposition")
+                        file_name = None
 
-                        # # 确保文件名有效
-                        # file_path = os.path.join(download_dir, file_name)
-                        #
-                        # # 保存文件到本地
-                        # with open(file_path, "wb") as file:
-                        #     file.write(await response.read())
-                        #
-                        # logger.info(f"电子书 {file_name} 下载完成，路径: {file_path}")
+                        if content_disposition:
+                            logger.info(f"Content-Disposition: {content_disposition}")
+
+                            # 先检查是否有 filename*= 条目
+                            file_name_match = re.search(r'filename\*=(?:UTF-8\'\')?([^;]+)', content_disposition)
+                            if file_name_match:
+                                file_name = file_name_match.group(1)
+                                file_name = unquote(file_name)  # 解码 URL 编码的文件名
+                            else:
+                                # 如果没有 filename*，则查找普通的 filename
+                                file_name_match = re.search(r'filename=["\']?([^;\']+)["\']?', content_disposition)
+                                if file_name_match:
+                                    file_name = file_name_match.group(1)
+
+                        # 如果未获取到文件名，使用默认值
+                        if not file_name or file_name.strip() == "":
+                            file_name = f"file_{int(time.time())}.epub"
 
                         # 发送文件到用户
-                        file = File(name="", file=ebook_url)
+                        file = File(name=file_name, file=ebook_url)
                         yield event.chain_result([file])
-
-                        # # 删除下载的文件
-                        # try:
-                        #     os.remove(file_path)
-                        #     logger.info(f"已成功删除文件: {file_path}")
-                        # except OSError as e:
-                        #     logger.error(f"删除文件 {file_path} 时出错: {e}")
-
                     else:
                         yield event.plain_result(f"无法下载电子书，状态码: {response.status}")
         except Exception as e:

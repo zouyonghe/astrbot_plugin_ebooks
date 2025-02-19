@@ -1,6 +1,6 @@
 name: astrbot_plugin_opds
 desc: 基于 OPDS 协议实现电子书搜索下载的插件
 help: 输入 /opds 查看关键词回复帮助。
-version: v0.0.1
+version: v1.0.0
 author: buding
 repo: https://github.com/zouyonghe/astrbot_plugin_opds

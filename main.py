@@ -56,6 +56,7 @@ class OPDS(Star):
         password = self.config.get("opds_password")  # 从配置中获取密码
 
         opds_api_url = f"{opds_url}/opds/search/{query}"  # 根据实际路径构造 API URL
+        logger.error(f"OPDS API URL: {opds_api_url}")
         auth = aiohttp.BasicAuth(username, password)  # 使用 Basic Authentication
 
         async with aiohttp.ClientSession(auth=auth) as session:
@@ -77,11 +78,7 @@ class OPDS(Star):
         try:
             logger.error(f"XML data: {xml_data}")
             root = ET.fromstring(xml_data)  # 把 XML 转换为元素树
-            # namespace = {"default": "http://www.w3.org/2005/Atom"}  # 定义命名空间
-            # 动态提取命名空间
-            namespace = {"default": root.tag[root.tag.find("{") + 1:root.tag.find("}")]}  # 提取默认命名空间
-            logger.debug(f"Extracted Namespace: {namespace}")
-
+            namespace = {"default": "http://www.w3.org/2005/Atom"}  # 定义命名空间
             entries = root.findall("default:entry", namespace)  # 查找所有 <entry> 节点
 
             results = []

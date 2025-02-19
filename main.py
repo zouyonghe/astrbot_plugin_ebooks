@@ -75,6 +75,7 @@ class OPDS(Star):
             root = ET.fromstring(xml_data)  # 把 XML 转换为元素树
             namespace = {"default": "http://www.w3.org/2005/Atom"}  # 定义命名空间
             entries = root.findall("default:entry", namespace)  # 查找所有 <entry> 节点
+            logger.error(len(root.findall("default:entry", namespace)))
 
             results = []
             for entry in entries:

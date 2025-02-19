@@ -281,12 +281,12 @@ class OPDS(Star):
             yield event.plain_result("处理请求时发生错误，请稍后重试或检查输入是否正确。")
 
     @llm_tool("opds_recommend_books")
-    async def recommend_books(self, event: AstrMessageEvent, n: int = 5):
+    async def recommend_books(self, event: AstrMessageEvent, n: str = "5"):
         """Randomly recommend n books from the OPDS catalog.
     
         Args:
-            n (int): Number of books to recommend (default is 5).
+            n (str): Number of books to recommend (default is 5).
         """
-        async for result in self.recommend(event, n):
+        async for result in self.recommend(event, int(n)):
             yield result
 

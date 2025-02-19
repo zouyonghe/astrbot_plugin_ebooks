@@ -209,7 +209,7 @@ class OPDS(Star):
             
     @llm_tool("opds_search_books")
     async def search_books(self, event: AstrMessageEvent, query: str):
-        """Search books by keywords or title through OPDS, only for searching but not for downloading.
+        """Search books by keywords or title through OPDS, but it cannot be used for downloading.
 
         Args:
             query (string): The search keyword or title to find books in the OPDS catalog.

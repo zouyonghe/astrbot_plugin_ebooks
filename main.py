@@ -51,7 +51,7 @@ class OPDS(Star):
             return
 
         try:
-            results = await self._search_opds(quote_plus(query))[:20]  # 调用搜索方法
+            results = await self._search_opds(quote_plus(query), 20)  # 调用搜索方法
             if not results or len(results) == 0:
                 yield event.plain_result("未找到相关的电子书。")
             else:
@@ -61,7 +61,7 @@ class OPDS(Star):
             logger.error(f"OPDS搜索失败: {e}")
             yield event.plain_result("搜索过程中出现错误，请稍后重试。")
 
-    async def _search_opds(self, query: str):
+    async def _search_opds(self, query: str, limit: int = None):
         '''调用 OPDS 目录 API 进行电子书搜索'''
         opds_url = self.config.get("opds_url", "http://127.0.0.1:8083")
         search_url = f"{opds_url}/opds/search/{query}"  # 根据实际路径构造 API URL
@@ -72,15 +72,15 @@ class OPDS(Star):
                     content_type = response.headers.get("Content-Type", "")
                     if "application/atom+xml" in content_type:
                         data = await response.text()
-                        return self._parse_opds_response(data)  # 调用解析方法
+                        return self._parse_opds_response(data, limit)  # 调用解析方法
                     else:
                         logger.error(f"Unexpected content type: {content_type}")
-                        return []
+                        return None
                 else:
                     logger.error(f"OPDS搜索失败，状态码: {response.status}")
-                    return []
+                    return None
 
-    def _parse_opds_response(self, xml_data: str):
+    def _parse_opds_response(self, xml_data: str, limit: int = None):
         '''解析 OPDS 搜索结果 XML 数据'''
         opds_url = self.config.get("opds_url", "http://127.0.0.1:8083")
 
@@ -159,7 +159,7 @@ class OPDS(Star):
                     "file_size": file_size
                 })
 
-            return results
+            return results[:limit]
         except ET.ParseError as e:
             logger.error(f"解析 OPDS 响应失败: {e}")
             return []
@@ -268,7 +268,7 @@ class OPDS(Star):
                 ebook_url = book_identifier
             else:
                 # Search the book by name
-                results = await self._search_opds(quote_plus(book_identifier))[:20]
+                results = await self._search_opds(quote_plus(book_identifier), 20)
                 matched_books = [
                     book for book in results if book_identifier.lower() in book["title"].lower()
                 ]

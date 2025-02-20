@@ -16,28 +16,34 @@ class OPDS(Star):
         self.config = config
 
     async def _show_result(self, event: AstrMessageEvent, results: list, guidance: str = "以下是电子书搜索结果："):
-        chain = [
-            Plain(guidance),
-        ]
-        for idx, item in enumerate(results):
-            chain.append(
-                Plain(f"\n{idx + 1}. {item['title']}")
-            )
+        if len(results) == 1:
+            chain = [
+                Plain(guidance),
+            ]
+            item = results[0]
             if item.get("cover_link"):
                 chain.append(Image.fromURL(item["cover_link"]))
             chain.append(Plain(f"\n作者: {item.get('authors', '未知作者')}"))
             chain.append(Plain(f"\n描述: {item.get('summary', '暂无描述')}"))
             chain.append(Plain(f"\n链接: {item['download_link']}"))
-
-        if len(results) <= 3:
             yield event.chain_result(chain)
         else:
-            node = Node(
-                uin=event.get_self_id(),
-                name="OPDS",
-                content=chain
-            )
-            yield event.chain_result([node])
+            nodes = [Node(uin=event.get_self_id(), name="OPDS", content=guidance)]
+            for idx, item in enumerate(results):
+                chain = [Plain(f"{idx + 1}. {item['title']}")]
+                if item.get("cover_link"):
+                    chain.append(Image.fromURL(item["cover_link"]))
+                chain.append(Plain(f"\n作者: {item.get('authors', '未知作者')}"))
+                chain.append(Plain(f"\n描述: {item.get('summary', '暂无描述')}"))
+                chain.append(Plain(f"\n链接: {item['download_link']}"))
+
+                node = Node(
+                    uin=event.get_self_id(),
+                    name="OPDS",
+                    content=chain
+                )
+                nodes.append(node)
+            yield event.chain_result(nodes)
 
     @command_group("opds")
     def opds(self):

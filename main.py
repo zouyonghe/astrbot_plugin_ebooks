@@ -51,7 +51,7 @@ class OPDS(Star):
             return
 
         try:
-            results = await self._search_opds(quote_plus(query))  # 调用搜索方法
+            results = await self._search_opds(quote_plus(query))[:20]  # 调用搜索方法
             if not results or len(results) == 0:
                 yield event.plain_result("未找到相关的电子书。")
             else:
@@ -87,7 +87,7 @@ class OPDS(Star):
         try:
             root = ET.fromstring(xml_data)  # 把 XML 转换为元素树
             namespace = {"default": "http://www.w3.org/2005/Atom"}  # 定义命名空间
-            entries = root.findall("default:entry", namespace)  # 查找所有 <entry> 节点
+            entries = root.findall("default:entry", namespace)  # 查找前20个 <entry> 节点
 
             results = []
             for entry in entries:
@@ -214,7 +214,7 @@ class OPDS(Star):
         try:
             # 调用 OPDS 搜索接口，默认搜索所有书籍
             query = "*"  # 空查询，可以调出完整书目
-            results = await self._search_opds(quote_plus(query))
+            results = await self._search_opds(query)
 
             # 检查是否有书籍可供推荐
             if not results:
@@ -268,7 +268,7 @@ class OPDS(Star):
                 ebook_url = book_identifier
             else:
                 # Search the book by name
-                results = await self._search_opds(quote_plus(book_identifier))
+                results = await self._search_opds(quote_plus(book_identifier))[:20]
                 matched_books = [
                     book for book in results if book_identifier.lower() in book["title"].lower()
                 ]

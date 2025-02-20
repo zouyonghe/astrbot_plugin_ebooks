@@ -52,7 +52,7 @@ class OPDS(Star):
 
         try:
             results = await self._search_opds(quote_plus(query))  # 调用搜索方法
-            if not results:
+            if not results or len(results) == 0:
                 yield event.plain_result("未找到相关的电子书。")
             else:
                 async for result in self._show_result(event, results):
@@ -75,10 +75,10 @@ class OPDS(Star):
                         return self._parse_opds_response(data)  # 调用解析方法
                     else:
                         logger.error(f"Unexpected content type: {content_type}")
-                        return None
+                        return []
                 else:
                     logger.error(f"OPDS搜索失败，状态码: {response.status}")
-                    return None
+                    return []
 
     def _parse_opds_response(self, xml_data: str):
         '''解析 OPDS 搜索结果 XML 数据'''
@@ -162,7 +162,7 @@ class OPDS(Star):
             return results
         except ET.ParseError as e:
             logger.error(f"解析 OPDS 响应失败: {e}")
-            return None
+            return []
 
     @opds.command("download")
     async def download(self, event: AstrMessageEvent, ebook_url: str = None):

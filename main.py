@@ -239,20 +239,27 @@ class OPDS(Star):
 
     @llm_tool("opds_search_books")
     async def search_books(self, event: AstrMessageEvent, query: str):
-        """Search books by keywords or title through OPDS, but it cannot be used for downloading.
-
+        """Search books by keywords or title through OPDS.
+        When to use:
+            Use this method to search for books in the OPDS catalog when user knows the title or keyword.
+            This method cannot be used for downloading books and should only be used for searching purposes.
+    
         Args:
             query (string): The search keyword or title to find books in the OPDS catalog.
+    
         """
         async for result in self.search(event, query):
             yield result
 
     @llm_tool("opds_download_book")
     async def download_book(self, event: AstrMessageEvent, book_identifier: str):
-        """Download a book by on a precise name or URL through OPDS.
+        """Download a book by a precise name or URL through OPDS.
+        When to use:
+            Use this method to download a specific book by its name or when a direct download link is available.
     
         Args:
-            book_identifier (string): The book name or URL of the book.
+            book_identifier (string): The book name (exact match) or the URL of the book link.
+    
         """
         try:
             ebook_url = ""
@@ -283,6 +290,8 @@ class OPDS(Star):
     @llm_tool("opds_recommend_books")
     async def recommend_books(self, event: AstrMessageEvent, n: str = "5"):
         """Randomly recommend n books from the OPDS catalog.
+        When to use:
+            Use this method to get a random selection of books when users are unsure what to read.
     
         Args:
             n (string): Number of books to recommend (default is 5).

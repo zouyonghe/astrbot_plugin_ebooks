@@ -91,8 +91,7 @@ class OPDS(Star):
                     content=chain
                 )
                 nodes.append(node)
-            for node in nodes:
-                yield event.chain_result([node])
+            yield event.chain_result(nodes)
 
     @command_group("opds")
     def opds(self):

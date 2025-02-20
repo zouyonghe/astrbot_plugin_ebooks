@@ -28,7 +28,9 @@ class OPDS(Star):
             chain.append(Plain(f"\n链接: {item['download_link']}"))
             yield event.chain_result(chain)
         else:
-            nodes = [Node(uin=event.get_self_id(), name="OPDS", content=guidance)]
+            chains = [[
+                Plain(guidance)
+            ]]
             for idx, item in enumerate(results):
                 chain = [Plain(f"{idx + 1}. {item['title']}")]
                 if item.get("cover_link"):
@@ -37,13 +39,13 @@ class OPDS(Star):
                 chain.append(Plain(f"\n描述: {item.get('summary', '暂无描述')}"))
                 chain.append(Plain(f"\n链接: {item['download_link']}"))
 
-                node = Node(
-                    uin=event.get_self_id(),
-                    name="OPDS",
-                    content=chain
-                )
-                nodes.append(node)
-            yield event.chain_result(nodes)
+                chains.append(chain)
+            node = Node(
+                uin=event.get_self_id(),
+                name="OPDS",
+                content=chains
+            )
+            yield event.chain_result([node])
 
     @command_group("opds")
     def opds(self):

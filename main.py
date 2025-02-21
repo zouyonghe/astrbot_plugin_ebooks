@@ -72,10 +72,9 @@ class OPDS(Star):
             #     content=chain
             # )
             # yield event.chain_result([node])
-            chunk_size = 100  # 每个 node 包含的最大项数
+            chunk_size = 3  # 每个 node 包含的最大项数
             nodes = []  # 用于存储所有生成的 node
 
-            #results = results[5:10]
 
             # 按 chunk 分割 results 数据
             for i in range(0, len(results), chunk_size):

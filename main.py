@@ -258,7 +258,7 @@ class OPDS(Star):
             return results[:limit]
         except ET.ParseError as e:
             logger.error(f"解析 OPDS 响应失败: {e}")
-            return []
+            return None
 
     @opds.command("download")
     async def download(self, event: AstrMessageEvent, ebook_url: str = None):
@@ -344,9 +344,9 @@ class OPDS(Star):
             query (string): The search keyword or title to find books in the OPDS catalog.
     
         """
-        results = self.search(event, query)
+        results = await self._search_opds(quote_plus(query), 10)
         if isinstance(results, list):
-            return self.to_string(results[:10])
+            return self.to_string(results)
         else:
             return "没有搜索到匹配的电子书。"
 

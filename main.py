@@ -37,7 +37,7 @@ class OPDS(Star):
             chain.append(Plain(f"\n链接: {item['download_link']}"))
             yield event.chain_result(chain)
 
-        elif 1 < len(results) <= 10:
+        else:
             for idx, item in enumerate(results):
                 chain.append(
                     Plain(f"{item['title']}")
@@ -45,21 +45,6 @@ class OPDS(Star):
                 if item.get("cover_link"):
                     chain.append(Image.fromURL(item["cover_link"]))
                 chain.append(Plain(f"链接: {item['download_link']}\n\n"))
-            node = Node(
-                uin=event.get_self_id(),
-                name="OPDS",
-                content=chain
-            )
-            yield event.chain_result([node])
-        else:
-            chain = [
-                Plain(f"{guidance}"),
-            ]
-            for idx, item in enumerate(results):
-                chain.append(
-                    Plain(f"\n{item['title']}")
-                )
-                chain.append(Plain(f"\n链接: {item['download_link']}\n"))
             node = Node(
                 uin=event.get_self_id(),
                 name="OPDS",

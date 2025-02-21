@@ -138,6 +138,9 @@ class OPDS(Star):
         '''解析 OPDS 搜索结果 XML 数据'''
         opds_url = self.config.get("opds_url", "http://127.0.0.1:8083")
 
+        # 移除非法字符
+        xml_data = re.sub(r'[^\x09\x0A\x0D\x20-\uD7FF\uE000-\uFFFD]', '', xml_data)
+
         for idx, line in enumerate(xml_data.splitlines(), 1):
             if 14795 <= idx < 14810:  # 适当调整打印行范围
                 logger.error(f"Line {idx}: {line}")

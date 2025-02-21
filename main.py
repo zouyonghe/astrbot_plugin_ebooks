@@ -35,15 +35,15 @@ class OPDS(Star):
 
         elif 1 < len(results) <= 10:
             chain = [
-                Plain(f"{guidance}"),
+                Plain(guidance),
             ]
             for idx, item in enumerate(results):
                 chain.append(
-                    Plain(f"\n{item['title']}")
+                    Plain(f"{item['title']}")
                 )
                 if item.get("cover_link"):
                     chain.append(Image.fromURL(item["cover_link"]))
-                chain.append(Plain(f"\n链接: {item['download_link']}\n"))
+                chain.append(Plain(f"链接: {item['download_link']}\n\n"))
             node = Node(
                 uin=event.get_self_id(),
                 name="OPDS",

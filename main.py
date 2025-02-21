@@ -33,7 +33,40 @@ class OPDS(Star):
             chain.append(Plain(f"\n链接: {item['download_link']}"))
             yield event.chain_result(chain)
 
+        elif 1 < len(results) <= 10:
+            chain = [
+                Plain(f"{guidance}"),
+            ]
+            for idx, item in enumerate(results):
+                chain.append(
+                    Plain(f"\n{idx + 1}. {item['title']}")
+                )
+                if item.get("cover_link"):
+                    chain.append(Image.fromURL(item["cover_link"]))
+                chain.append(Plain(f"作者: {item.get('authors', '未知作者')}"))
+                chain.append(Plain(f"\n描述: {item.get('summary', '暂无描述')}"))
+                chain.append(Plain(f"\n链接: {item['download_link']}\n"))
+            node = Node(
+                uin=event.get_self_id(),
+                name="OPDS",
+                content=chain
+            )
+            yield event.chain_result([node])
         else:
+            chain = [
+                Plain(f"{guidance}"),
+            ]
+            for idx, item in enumerate(results):
+                chain.append(
+                    Plain(f"\n{idx + 1}. {item['title']}")
+                )
+                chain.append(Plain(f"\n链接: {item['download_link']}\n"))
+            node = Node(
+                uin=event.get_self_id(),
+                name="OPDS",
+                content=chain
+            )
+            yield event.chain_result([node])
             # nodes = [Node(uin=event.get_self_id(), name="OPDS", content=guidance)]
             #
             # for idx, item in enumerate(results):
@@ -52,54 +85,35 @@ class OPDS(Star):
             #     nodes.append(node)
             # yield event.chain_result(nodes)
 
-            # chain = [
-            #     Plain(f"{guidance}"),
-            # ]
-            # for idx, item in enumerate(results):
-            #     chain.append(
-            #         Plain(f"\n{idx + 1}. {item['title']}")
-            #     )
-            #     if item.get("cover_link"):
-            #         chain.append(Image.fromURL(item["cover_link"]))
-            #     chain.append(Plain(f"作者: {item.get('authors', '未知作者')}"))
-            #     chain.append(Plain(f"\n描述: {item.get('summary', '暂无描述')}"))
-            #     chain.append(Plain(f"\n链接: {item['download_link']}\n"))
-            # node = Node(
-            #     uin=event.get_self_id(),
-            #     name="OPDS",
-            #     content=chain
-            # )
-            # yield event.chain_result([node])
-            chunk_size = 1  # 每个 node 包含的最大项数
-            nodes = []  # 用于存储所有生成的 node
 
-
+            # chunk_size = 1  # 每个 node 包含的最大项数
+            # nodes = []  # 用于存储所有生成的 node
             # 按 chunk 分割 results 数据
-            for i in range(0, len(results), chunk_size):
-                chunk = results[i:i + chunk_size]  # 分割数据
-                chain = [
-                    Plain(f"{guidance}"),
-                ]
-                for idx, item in enumerate(chunk):
-                    chain.append(
-                        Plain(f"\n{i + idx + 1}. {item['title']}")  # 注意索引保持全局编号
-                    )
-                    if item.get("cover_link"):
-                        chain.append(Image.fromURL(item["cover_link"]))
-                    else:
-                        chain.append(Plain("\n"))
-                    chain.append(Plain(f"作者: {item.get('authors', '未知作者')}"))
-                    chain.append(Plain(f"\n描述: {item.get('summary', '暂无描述')}"))
-                    chain.append(Plain(f"\n链接: {item['download_link']}\n"))
-
-                # 创建一个独立的 node
-                node = Node(
-                    uin=event.get_self_id(),
-                    name="OPDS",
-                    content=chain
-                )
-                nodes.append(node)
-            yield event.chain_result(nodes)
+            # for i in range(0, len(results), chunk_size):
+            #     chunk = results[i:i + chunk_size]  # 分割数据
+            #     chain = [
+            #         Plain(f"{guidance}"),
+            #     ]
+            #     for idx, item in enumerate(chunk):
+            #         chain.append(
+            #             Plain(f"\n{i + idx + 1}. {item['title']}")  # 注意索引保持全局编号
+            #         )
+            #         if item.get("cover_link"):
+            #             chain.append(Image.fromURL(item["cover_link"]))
+            #         else:
+            #             chain.append(Plain("\n"))
+            #         chain.append(Plain(f"作者: {item.get('authors', '未知作者')}"))
+            #         chain.append(Plain(f"\n描述: {item.get('summary', '暂无描述')}"))
+            #         chain.append(Plain(f"\n链接: {item['download_link']}\n"))
+            #
+            #     # 创建一个独立的 node
+            #     node = Node(
+            #         uin=event.get_self_id(),
+            #         name="OPDS",
+            #         content=chain
+            #     )
+            #     nodes.append(node)
+            # yield event.chain_result(nodes)
 
     @command_group("opds")
     def opds(self):

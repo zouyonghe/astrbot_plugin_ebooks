@@ -150,6 +150,8 @@ class OPDS(Star):
 
         # 移除非法字符
         xml_data = re.sub(r'[^\x09\x0A\x0D\x20-\uD7FF\uE000-\uFFFD]', '', xml_data)
+        # 消除多余空格
+        xml_data = re.sub(r'\s+', ' ', xml_data)
 
         try:
             root = ET.fromstring(xml_data)  # 把 XML 转换为元素树

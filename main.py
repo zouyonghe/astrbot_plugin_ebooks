@@ -75,8 +75,9 @@ class OPDS(Star):
             chunk_size = 100  # 每个 node 包含的最大项数
             nodes = []  # 用于存储所有生成的 node
 
-            # 按 chunk 分割 results 数据
+            results = results[5:10]
 
+            # 按 chunk 分割 results 数据
             for i in range(0, len(results), chunk_size):
                 chunk = results[i:i + chunk_size]  # 分割数据
                 chain = [
@@ -113,7 +114,7 @@ class OPDS(Star):
             return
 
         try:
-            results = await self._search_opds(quote_plus(query), 5)  # 调用搜索方法
+            results = await self._search_opds(quote_plus(query), 10)  # 调用搜索方法
             if not results or len(results) == 0:
                 yield event.plain_result("未找到相关的电子书。")
             else:

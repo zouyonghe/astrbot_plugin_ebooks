@@ -107,6 +107,29 @@ class OPDS(Star):
             #     nodes.append(node)
             # yield event.chain_result(nodes)
 
+    def to_string(self, results: list) -> str:
+        """
+        将结果列表中的所有项目拼接为字符串。
+
+        Args:
+            results (list): 包含字典的结果列表，其中每个字典表示一个条目。
+
+        Returns:
+            str: 拼接后的总字符串表示结果。
+        """
+        if not results:
+            return "没有找到结果。"
+
+        result_strings = []
+        for item in results:
+            part = f"标题: {item.get('title', '未知标题')}\n"
+            part += f"作者: {item.get('authors', '未知作者')}\n"
+            part += f"描述: {item.get('summary', '暂无描述')}\n"
+            part += f"链接: {item.get('download_link', '无下载链接')}\n"
+            result_strings.append(part)
+
+        return "\n\n".join(result_strings)
+
     @command_group("opds")
     def opds(self):
         pass
@@ -321,8 +344,11 @@ class OPDS(Star):
             query (string): The search keyword or title to find books in the OPDS catalog.
     
         """
-        async for result in self.search(event, query):
-            yield result
+        results = self.search(event, query)
+        if isinstance(results, list):
+            return self.to_string(results[:10])
+        else:
+            return "没有搜索到匹配的电子书。"
 
     @llm_tool("opds_download_book")
     async def download_book(self, event: AstrMessageEvent, book_identifier: str):

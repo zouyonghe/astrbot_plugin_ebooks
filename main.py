@@ -138,6 +138,10 @@ class OPDS(Star):
         '''解析 OPDS 搜索结果 XML 数据'''
         opds_url = self.config.get("opds_url", "http://127.0.0.1:8083")
 
+        for idx, line in enumerate(xml_data.splitlines(), 1):
+            if 14795 <= idx < 14810:  # 适当调整打印行范围
+                logger.error(f"Line {idx}: {line}")
+
         try:
             root = ET.fromstring(xml_data)  # 把 XML 转换为元素树
             namespace = {"default": "http://www.w3.org/2005/Atom"}  # 定义命名空间

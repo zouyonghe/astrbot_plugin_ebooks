@@ -28,7 +28,7 @@ class OPDS(Star):
         if len(results) == 1:
             item = results[0]
             chain.append(
-                Plain(f"{item['title']}")  # 注意索引保持全局编号
+                Plain(f"{item['title']}")
             )
             if item.get("cover_link"):
                 chain.append(Image.fromURL(item["cover_link"]))
@@ -41,12 +41,18 @@ class OPDS(Star):
 
         else:
             for idx, item in enumerate(results):
+                if idx > 0:  # 从第二个项目开始，每项之间空一行
+                    chain.append(Plain("\n"))
+
                 chain.append(
                     Plain(f"{item['title']}")
                 )
                 if item.get("cover_link"):
                     chain.append(Image.fromURL(item["cover_link"]))
-                chain.append(Plain(f"链接: {item['download_link']}\n\n"))
+                else:
+                    chain.append(Plain("\n"))
+                chain.append(Plain(f"链接: {item['download_link']}"))
+
             node = Node(
                 uin=event.get_self_id(),
                 name="OPDS",

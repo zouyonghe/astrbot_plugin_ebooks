@@ -18,10 +18,14 @@ class OPDS(Star):
     async def _show_result(self, event: AstrMessageEvent, results: list, guidance: str = None):
         if not results:
             yield event.plain_result("未找到相关的电子书。")
-        elif len(results) == 1:
+
+        if not guidance:
+            chain = []
+        else:
             chain = [
                 Plain(guidance),
             ]
+        if len(results) == 1:
             item = results[0]
             chain.append(
                 Plain(f"{item['title']}")  # 注意索引保持全局编号
@@ -34,9 +38,6 @@ class OPDS(Star):
             yield event.chain_result(chain)
 
         elif 1 < len(results) <= 10:
-            chain = [
-                Plain(guidance),
-            ]
             for idx, item in enumerate(results):
                 chain.append(
                     Plain(f"{item['title']}")

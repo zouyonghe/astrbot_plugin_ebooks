@@ -69,7 +69,7 @@ class OPDS(Star):
             #     content=chain
             # )
             # yield event.chain_result([node])
-            chunk_size = 10  # 每个 node 包含的最大项数
+            chunk_size = 100  # 每个 node 包含的最大项数
             nodes = []  # 用于存储所有生成的 node
 
             # 按 chunk 分割 results 数据
@@ -110,7 +110,7 @@ class OPDS(Star):
             return
 
         try:
-            results = await self._search_opds(quote_plus(query), 90)  # 调用搜索方法
+            results = await self._search_opds(quote_plus(query), 30)  # 调用搜索方法
             if not results or len(results) == 0:
                 yield event.plain_result("未找到相关的电子书。")
             else:
@@ -330,7 +330,7 @@ class OPDS(Star):
                 ebook_url = book_identifier
             else:
                 # Search the book by name
-                results = await self._search_opds(quote_plus(book_identifier), 20)
+                results = await self._search_opds(quote_plus(book_identifier), 90)
                 matched_books = [
                     book for book in results if book_identifier.lower() in book["title"].lower()
                 ]

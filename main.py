@@ -25,9 +25,12 @@ class OPDS(Star):
                 Plain(guidance),
             ]
             item = results[0]
+            chain.append(
+                Plain(f"\n{item['title']}")  # 注意索引保持全局编号
+            )
             if item.get("cover_link"):
                 chain.append(Image.fromURL(item["cover_link"]))
-            chain.append(Plain(f"\n作者: {item.get('authors', '未知作者')}"))
+            chain.append(Plain(f"作者: {item.get('authors', '未知作者')}"))
             chain.append(Plain(f"\n描述: {item.get('summary', '暂无描述')}"))
             chain.append(Plain(f"\n链接: {item['download_link']}"))
             yield event.chain_result(chain)
@@ -110,7 +113,7 @@ class OPDS(Star):
             return
 
         try:
-            results = await self._search_opds(quote_plus(query), 1)  # 调用搜索方法
+            results = await self._search_opds(quote_plus(query), 10)  # 调用搜索方法
             if not results or len(results) == 0:
                 yield event.plain_result("未找到相关的电子书。")
             else:

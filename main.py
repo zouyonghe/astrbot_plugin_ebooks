@@ -72,7 +72,7 @@ class OPDS(Star):
             #     content=chain
             # )
             # yield event.chain_result([node])
-            chunk_size = 3  # 每个 node 包含的最大项数
+            chunk_size = 100  # 每个 node 包含的最大项数
             nodes = []  # 用于存储所有生成的 node
 
 
@@ -88,6 +88,8 @@ class OPDS(Star):
                     )
                     if item.get("cover_link"):
                         chain.append(Image.fromURL(item["cover_link"]))
+                    else:
+                        chain.append(Plain("\n"))
                     chain.append(Plain(f"作者: {item.get('authors', '未知作者')}"))
                     chain.append(Plain(f"\n描述: {item.get('summary', '暂无描述')}"))
                     chain.append(Plain(f"\n链接: {item['download_link']}\n"))
@@ -113,7 +115,7 @@ class OPDS(Star):
             return
 
         try:
-            results = await self._search_opds(quote_plus(query), 10)  # 调用搜索方法
+            results = await self._search_opds(quote_plus(query), 300)  # 调用搜索方法
             if not results or len(results) == 0:
                 yield event.plain_result("未找到相关的电子书。")
             else:

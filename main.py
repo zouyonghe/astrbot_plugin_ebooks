@@ -42,7 +42,7 @@ class OPDS(Star):
         else:
             for idx, item in enumerate(results):
                 if idx > 0:  # 从第二个项目开始，每项之间空一行
-                    chain.append(Plain("\n"))
+                    chain.append(Plain("\n\n"))
 
                 chain.append(
                     Plain(f"{item['title']}")

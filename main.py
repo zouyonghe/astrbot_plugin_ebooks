@@ -16,7 +16,10 @@ class OPDS(Star):
         self.config = config
 
     async def _show_result(self, event: AstrMessageEvent, results: list, guidance: str = "以下是电子书搜索结果："):
-        if len(results) == 1:
+        if not results:
+            yield event.plain_result("未找到相关的电子书。")
+
+        elif len(results) == 1:
             chain = [
                 Plain(guidance),
             ]
@@ -27,6 +30,7 @@ class OPDS(Star):
             chain.append(Plain(f"\n描述: {item.get('summary', '暂无描述')}"))
             chain.append(Plain(f"\n链接: {item['download_link']}"))
             yield event.chain_result(chain)
+
         else:
             # nodes = [Node(uin=event.get_self_id(), name="OPDS", content=guidance)]
             #
@@ -140,10 +144,6 @@ class OPDS(Star):
 
         # 移除非法字符
         xml_data = re.sub(r'[^\x09\x0A\x0D\x20-\uD7FF\uE000-\uFFFD]', '', xml_data)
-
-        for idx, line in enumerate(xml_data.splitlines(), 1):
-            if 14795 <= idx < 14810:  # 适当调整打印行范围
-                logger.error(f"Line {idx}: {line}")
 
         try:
             root = ET.fromstring(xml_data)  # 把 XML 转换为元素树

@@ -16,6 +16,7 @@ class OPDS(Star):
         self.config = config
 
     async def _show_result(self, event: AstrMessageEvent, results: list, guidance: str = "以下是电子书搜索结果："):
+        logger.error(f"Results length: {len(results)}")
         if not results:
             yield event.plain_result("未找到相关的电子书。")
 

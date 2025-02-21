@@ -15,7 +15,7 @@ class OPDS(Star):
         super().__init__(context)
         self.config = config
 
-    async def _show_result(self, event: AstrMessageEvent, results: list, guidance: str = "以下是电子书搜索结果："):
+    async def _show_result(self, event: AstrMessageEvent, results: list, guidance: str = None):
         if not results:
             yield event.plain_result("未找到相关的电子书。")
         elif len(results) == 1:
@@ -24,7 +24,7 @@ class OPDS(Star):
             ]
             item = results[0]
             chain.append(
-                Plain(f"\n{item['title']}")  # 注意索引保持全局编号
+                Plain(f"{item['title']}")  # 注意索引保持全局编号
             )
             if item.get("cover_link"):
                 chain.append(Image.fromURL(item["cover_link"]))
@@ -39,7 +39,7 @@ class OPDS(Star):
             ]
             for idx, item in enumerate(results):
                 chain.append(
-                    Plain(f"\n{idx + 1}. {item['title']}")
+                    Plain(f"\n{item['title']}")
                 )
                 if item.get("cover_link"):
                     chain.append(Image.fromURL(item["cover_link"]))
@@ -56,7 +56,7 @@ class OPDS(Star):
             ]
             for idx, item in enumerate(results):
                 chain.append(
-                    Plain(f"\n{idx + 1}. {item['title']}")
+                    Plain(f"\n{item['title']}")
                 )
                 chain.append(Plain(f"\n链接: {item['download_link']}\n"))
             node = Node(
@@ -355,7 +355,7 @@ class OPDS(Star):
                 if len(matched_books) == 1:
                     ebook_url = matched_books[0]["download_link"]
                 elif len(matched_books) > 1:
-                    async for result in self._show_result(event, results, guidance="搜索到如下电子书，请使用链接下载："):
+                    async for result in self._show_result(event, results, guidance="请使用链接下载电子书。\n"):
                         yield result
                 else:
                     yield event.plain_result("未能找到匹配的电子书，请提供准确书名或电子书下载链接。")

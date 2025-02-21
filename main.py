@@ -260,6 +260,25 @@ class OPDS(Star):
             logger.error(f"解析 OPDS 响应失败: {e}")
             return None
 
+    @opds.command("help")
+    async def show_help(self, event: AstrMessageEvent):
+        '''显示 OPDS 插件帮助信息'''
+        help_msg = [
+            "📚 OPDS 插件使用指南",
+            "该插件通过标准的 OPDS 协议与电子书目录交互，支持搜索、下载和推荐功能。",
+            "",
+            "🔧 **命令列表**:",
+            "- `/opds search [关键词]`：搜索 OPDS 目录中的电子书。例如：`/opds search Python`。",
+            "- `/opds download [下载链接/书名]`：通过 OPDS 直接下载电子书。例如：`/opds download http://example.com/path/to/book`。",
+            "- `/opds recommend [数量]`：随机推荐指定数量的电子书。例如：`/opds recommend 5`。",
+            "- `/opds help`：显示当前插件的帮助信息（即此内容）。",
+            "",
+            "📒 **注意事项**:",
+            "- 下载指令支持直接输入电子书的下载链接或通过精确书名匹配来下载。",
+            "- 使用推荐功能时，插件会从现有书目中随机选择书籍。",
+        ]
+        yield event.plain_result("\n".join(help_msg))
+
     @opds.command("download")
     async def download(self, event: AstrMessageEvent, ebook_url: str = None):
         '''通过 OPDS 协议下载电子书'''

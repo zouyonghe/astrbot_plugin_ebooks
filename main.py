@@ -43,8 +43,6 @@ class OPDS(Star):
                 )
                 if item.get("cover_link"):
                     chain.append(Image.fromURL(item["cover_link"]))
-                chain.append(Plain(f"作者: {item.get('authors', '未知作者')}"))
-                chain.append(Plain(f"\n描述: {item.get('summary', '暂无描述')}"))
                 chain.append(Plain(f"\n链接: {item['download_link']}\n"))
             node = Node(
                 uin=event.get_self_id(),
@@ -127,7 +125,7 @@ class OPDS(Star):
             return
 
         try:
-            results = await self._search_opds(quote_plus(query), 300)  # 调用搜索方法
+            results = await self._search_opds(quote_plus(query))  # 调用搜索方法
             if not results or len(results) == 0:
                 yield event.plain_result("未找到相关的电子书。")
             else:
@@ -349,7 +347,7 @@ class OPDS(Star):
                 ebook_url = book_identifier
             else:
                 # Search the book by name
-                results = await self._search_opds(quote_plus(book_identifier), 90)
+                results = await self._search_opds(quote_plus(book_identifier))
                 matched_books = [
                     book for book in results if book_identifier.lower() in book["title"].lower()
                 ]
@@ -357,7 +355,7 @@ class OPDS(Star):
                 if len(matched_books) == 1:
                     ebook_url = matched_books[0]["download_link"]
                 elif len(matched_books) > 1:
-                    async for result in self._show_result(event, results):
+                    async for result in self._show_result(event, results, guidance="搜索到如下电子书，请使用链接下载："):
                         yield result
                 else:
                     yield event.plain_result("未能找到匹配的电子书，请提供准确书名或电子书下载链接。")

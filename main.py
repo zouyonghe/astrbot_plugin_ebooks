@@ -69,7 +69,7 @@ class OPDS(Star):
             #     content=chain
             # )
             # yield event.chain_result([node])
-            chunk_size = 30  # 每个 node 包含的最大项数
+            chunk_size = 10  # 每个 node 包含的最大项数
             nodes = []  # 用于存储所有生成的 node
 
             # 按 chunk 分割 results 数据
@@ -83,8 +83,8 @@ class OPDS(Star):
                     chain.append(
                         Plain(f"\n{i + idx + 1}. {item['title']}")  # 注意索引保持全局编号
                     )
-                    # if item.get("cover_link"):
-                    #     chain.append(Image.fromURL(item["cover_link"]))
+                    if item.get("cover_link"):
+                        chain.append(Image.fromURL(item["cover_link"]))
                     chain.append(Plain(f"作者: {item.get('authors', '未知作者')}"))
                     chain.append(Plain(f"\n描述: {item.get('summary', '暂无描述')}"))
                     chain.append(Plain(f"\n链接: {item['download_link']}\n"))

@@ -184,7 +184,7 @@ class OPDS(Star):
                 # 提取图书封面链接（rel="http://opds-spec.org/image"）
                 cover_element = entry.find("default:link[@rel='http://opds-spec.org/image']", namespace)
                 cover_suffix = cover_element.attrib.get("href", "") if cover_element is not None else ""
-                if cover_suffix:
+                if cover_suffix and re.match(r"^/opds/cover/\d+$", cover_suffix):
                     cover_link = urljoin(opds_url, cover_suffix)
                 else:
                     cover_link = ""
@@ -192,7 +192,7 @@ class OPDS(Star):
                 # 提取图书缩略图链接（rel="http://opds-spec.org/image/thumbnail"）
                 thumbnail_element = entry.find("default:link[@rel='http://opds-spec.org/image/thumbnail']", namespace)
                 thumbnail_suffix = thumbnail_element.attrib.get("href", "") if thumbnail_element is not None else ""
-                if thumbnail_suffix:
+                if thumbnail_suffix and re.match(r"^/opds/cover/\d+$", thumbnail_suffix):
                     thumbnail_link = urljoin(opds_url, thumbnail_suffix)
                 else:
                     thumbnail_link = ""
@@ -201,7 +201,7 @@ class OPDS(Star):
                 acquisition_element = entry.find("default:link[@rel='http://opds-spec.org/acquisition']", namespace)
                 if acquisition_element is not None:
                     download_suffix = acquisition_element.attrib.get("href", "") if acquisition_element is not None else ""
-                    if download_suffix:
+                    if download_suffix and re.match(r"^/opds/download/\d+/[\w]+/$", download_suffix):
                         download_link = urljoin(opds_url, download_suffix)
                     else:
                         download_link = ""

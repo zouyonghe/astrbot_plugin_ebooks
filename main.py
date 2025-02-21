@@ -110,7 +110,7 @@ class OPDS(Star):
             return
 
         try:
-            results = await self._search_opds(quote_plus(query), 30)  # 调用搜索方法
+            results = await self._search_opds(quote_plus(query), 15)  # 调用搜索方法
             if not results or len(results) == 0:
                 yield event.plain_result("未找到相关的电子书。")
             else:

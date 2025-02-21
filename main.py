@@ -25,8 +25,8 @@ class OPDS(Star):
                 Plain(guidance),
             ]
             item = results[0]
-            if item.get("cover_link"):
-                chain.append(Image.fromURL(item["cover_link"]))
+            # if item.get("cover_link"):
+            #     chain.append(Image.fromURL(item["cover_link"]))
             chain.append(Plain(f"\n作者: {item.get('authors', '未知作者')}"))
             chain.append(Plain(f"\n描述: {item.get('summary', '暂无描述')}"))
             chain.append(Plain(f"\n链接: {item['download_link']}"))

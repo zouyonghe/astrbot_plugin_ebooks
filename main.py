@@ -19,17 +19,11 @@ class OPDS(Star):
         if not results:
             yield event.plain_result("未找到相关的电子书。")
 
-        if not guidance:
-            chain = []
-        else:
-            chain = [
-                Plain(guidance),
-            ]
         if len(results) == 1:
             item = results[0]
-            chain.append(
+            chain = [
                 Plain(f"{item['title']}")
-            )
+            ]
             if item.get("cover_link"):
                 chain.append(Image.fromURL(item["cover_link"]))
             else:
@@ -38,74 +32,26 @@ class OPDS(Star):
             chain.append(Plain(f"\n描述: {item.get('summary', '暂无描述')}"))
             chain.append(Plain(f"\n链接: {item['download_link']}"))
             yield event.chain_result(chain)
-
         else:
+            ns = Nodes([])
+            ns.nodes.append(Node(uin=event.get_self_id(), name="OPDS", content=guidance))
             for idx, item in enumerate(results):
-                if idx > 0:  # 从第二个项目开始，每项之间空一行
-                    chain.append(Plain("\n\n"))
-
-                chain.append(
-                    Plain(f"{item['title']}")
-                )
+                chain = [Plain(f"{idx + 1}. {item['title']}")]
                 if item.get("cover_link"):
                     chain.append(Image.fromURL(item["cover_link"]))
                 else:
                     chain.append(Plain("\n"))
-                chain.append(Plain(f"链接: {item['download_link']}"))
+                chain.append(Plain(f"作者: {item.get('authors', '未知作者')}"))
+                chain.append(Plain(f"\n描述: {item.get('summary', '暂无描述')}"))
+                chain.append(Plain(f"\n链接: {item['download_link']}"))
 
-            node = Node(
-                uin=event.get_self_id(),
-                name="OPDS",
-                content=chain
-            )
-            yield event.chain_result([node])
-            # nodes = [Node(uin=event.get_self_id(), name="OPDS", content=guidance)]
-            #
-            # for idx, item in enumerate(results):
-            #     chain = [Plain(f"{idx + 1}. {item['title']}")]
-            #     if item.get("cover_link"):
-            #         chain.append(Image.fromURL(item["cover_link"]))
-            #     chain.append(Plain(f"\n作者: {item.get('authors', '未知作者')}"))
-            #     chain.append(Plain(f"\n描述: {item.get('summary', '暂无描述')}"))
-            #     chain.append(Plain(f"\n链接: {item['download_link']}"))
-            #
-            #     node = Node(
-            #         uin=event.get_self_id(),
-            #         name="OPDS",
-            #         content=chain
-            #     )
-            #     nodes.append(node)
-            # yield event.chain_result(nodes)
-
-
-            # chunk_size = 1  # 每个 node 包含的最大项数
-            # nodes = []  # 用于存储所有生成的 node
-            # 按 chunk 分割 results 数据
-            # for i in range(0, len(results), chunk_size):
-            #     chunk = results[i:i + chunk_size]  # 分割数据
-            #     chain = [
-            #         Plain(f"{guidance}"),
-            #     ]
-            #     for idx, item in enumerate(chunk):
-            #         chain.append(
-            #             Plain(f"\n{i + idx + 1}. {item['title']}")  # 注意索引保持全局编号
-            #         )
-            #         if item.get("cover_link"):
-            #             chain.append(Image.fromURL(item["cover_link"]))
-            #         else:
-            #             chain.append(Plain("\n"))
-            #         chain.append(Plain(f"作者: {item.get('authors', '未知作者')}"))
-            #         chain.append(Plain(f"\n描述: {item.get('summary', '暂无描述')}"))
-            #         chain.append(Plain(f"\n链接: {item['download_link']}\n"))
-            #
-            #     # 创建一个独立的 node
-            #     node = Node(
-            #         uin=event.get_self_id(),
-            #         name="OPDS",
-            #         content=chain
-            #     )
-            #     nodes.append(node)
-            # yield event.chain_result(nodes)
+                node = Node(
+                    uin=event.get_self_id(),
+                    name="OPDS",
+                    content=chain
+                )
+                ns.nodes.append(node)
+            yield event.chain_result([ns])
 
     def to_string(self, results: list) -> str:
         """
@@ -146,7 +92,7 @@ class OPDS(Star):
             if not results or len(results) == 0:
                 yield event.plain_result("未找到相关的电子书。")
             else:
-                async for result in self._show_result(event, results):
+                async for result in self._show_result(event, results, "电子书搜索结果："):
                     yield result
         except Exception as e:
             logger.error(f"OPDS搜索失败: {e}")
@@ -363,7 +309,7 @@ class OPDS(Star):
             query (string): The search keyword or title to find books in the OPDS catalog.
     
         """
-        results = await self._search_opds(quote_plus(query), 10)
+        results = await self._search_opds(quote_plus(query), 20)
         if isinstance(results, list):
             return self.to_string(results)
         else:

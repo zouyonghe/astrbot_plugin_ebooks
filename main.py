@@ -290,7 +290,7 @@ class OPDS(Star):
             recommended_books = random.sample(results, n)
 
             # 显示推荐书籍
-            guidance = f"如下是随机推荐的 {n} 本电子书：\n"
+            guidance = f"如下是随机推荐的 {n} 本电子书"
             async for result in self._show_result(event, recommended_books, guidance):
                 yield result
 

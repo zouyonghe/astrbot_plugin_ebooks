@@ -36,7 +36,7 @@ class OPDS(Star):
             ns = Nodes([])
             ns.nodes.append(Node(uin=event.get_self_id(), name="OPDS", content=guidance))
             for idx, item in enumerate(results):
-                chain = [Plain(f"{idx + 1}. {item['title']}")]
+                chain = [Plain(f"{item['title']}")]
                 if item.get("cover_link"):
                     chain.append(Image.fromURL(item["cover_link"]))
                 else:
@@ -92,7 +92,7 @@ class OPDS(Star):
             if not results or len(results) == 0:
                 yield event.plain_result("未找到相关的电子书。")
             else:
-                async for result in self._show_result(event, results, "电子书搜索结果："):
+                async for result in self._show_result(event, results, "电子书搜索结果"):
                     yield result
         except Exception as e:
             logger.error(f"OPDS搜索失败: {e}")

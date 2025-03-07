@@ -11,7 +11,7 @@ from astrbot.api.event.filter import *
 
 @register("opds", "buding", "一个基于OPDS的电子书搜索和下载插件", "1.0.0", "https://github.com/zouyonghe/astrbot_plugin_opds")
 class OPDS(Star):
-    def __init__(self, context: Context, config: dict):
+    def __init__(self, context: Context, config: AstrBotConfig):
         super().__init__(context)
         self.config = config
 

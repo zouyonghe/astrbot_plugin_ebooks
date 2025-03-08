@@ -605,7 +605,7 @@ class ebooks(Star):
                     description = self._parse_html_to_text(description)
                 else:
                     description = description.strip()
-                description = description[:200] + "..." if len(description) > 200 else description
+                description = description[:150] + "..." if len(description) > 150 else description
             else:
                 description = "无简介"
 
@@ -811,7 +811,7 @@ class ebooks(Star):
                 description = book.get('description', '无简介')
                 if isinstance(description, str):
                     description = description.strip()
-                    description = description[:200] + "..." if len(description) > 200 else description
+                    description = description[:150] + "..." if len(description) > 150 else description
                 else:
                     description = "无简介"
                 chain.append(Plain(f"简介: {description}\n"))

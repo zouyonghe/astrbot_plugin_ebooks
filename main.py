@@ -29,7 +29,7 @@ class ebooks(Star):
     async def _search_calibre_web(self, query: str, limit: int = None):
         '''Call the Calibre-Web Catalog API to search for eBooks.'''
         calibre_web_url = self.config.get("calibre_web_url", "http://127.0.0.1:8083")
-        search_url = f"{calibre_web_url}/Calibre-Web/search/{query}"  # 根据实际路径构造 API URL
+        search_url = f"{calibre_web_url}/opds/search/{query}"  # 根据实际路径构造 API URL
 
         async with aiohttp.ClientSession() as session:
             async with session.get(search_url) as response:
@@ -46,7 +46,7 @@ class ebooks(Star):
                     return None
 
     def _parse_opds_response(self, xml_data: str, limit: int = None):
-        '''Parse the Calibre-Web search result XML data.'''
+        '''Parse the opds search result XML data.'''
         calibre_web_url = self.config.get("calibre_web_url", "http://127.0.0.1:8083")
 
         # Remove illegal characters
@@ -84,27 +84,27 @@ class ebooks(Star):
                 lang_element = entry.find("default:dcterms:language", namespace)
                 language = lang_element.text if lang_element is not None else "未知语言"
 
-                # 提取图书封面链接（rel="http://Calibre-Web-spec.org/image"）
-                cover_element = entry.find("default:link[@rel='http://Calibre-Web-spec.org/image']", namespace)
+                # 提取图书封面链接（rel="http://opds-spec.org/image"）
+                cover_element = entry.find("default:link[@rel='http://opds-spec.org/image']", namespace)
                 cover_suffix = cover_element.attrib.get("href", "") if cover_element is not None else ""
-                if cover_suffix and re.match(r"^/Calibre-Web/cover/\d+$", cover_suffix):
+                if cover_suffix and re.match(r"^/opds/cover/\d+$", cover_suffix):
                     cover_link = urljoin(calibre_web_url, cover_suffix)
                 else:
                     cover_link = ""
 
-                # 提取图书缩略图链接（rel="http://Calibre-Web-spec.org/image/thumbnail"）
-                thumbnail_element = entry.find("default:link[@rel='http://Calibre-Web-spec.org/image/thumbnail']", namespace)
+                # 提取图书缩略图链接（rel="http://opds-spec.org/image/thumbnail"）
+                thumbnail_element = entry.find("default:link[@rel='http://opds-spec.org/image/thumbnail']", namespace)
                 thumbnail_suffix = thumbnail_element.attrib.get("href", "") if thumbnail_element is not None else ""
-                if thumbnail_suffix and re.match(r"^/Calibre-Web/cover/\d+$", thumbnail_suffix):
+                if thumbnail_suffix and re.match(r"^/opds/cover/\d+$", thumbnail_suffix):
                     thumbnail_link = urljoin(calibre_web_url, thumbnail_suffix)
                 else:
                     thumbnail_link = ""
 
-                # 提取下载链接及其格式（rel="http://Calibre-Web-spec.org/acquisition"）
-                acquisition_element = entry.find("default:link[@rel='http://Calibre-Web-spec.org/acquisition']", namespace)
+                # 提取下载链接及其格式（rel="http://opds-spec.org/acquisition"）
+                acquisition_element = entry.find("default:link[@rel='http://opds-spec.org/acquisition']", namespace)
                 if acquisition_element is not None:
                     download_suffix = acquisition_element.attrib.get("href", "") if acquisition_element is not None else ""
-                    if download_suffix and re.match(r"^/Calibre-Web/download/\d+/[\w]+/$", download_suffix):
+                    if download_suffix and re.match(r"^/opds/download/\d+/[\w]+/$", download_suffix):
                         download_link = urljoin(calibre_web_url, download_suffix)
                     else:
                         download_link = ""
@@ -131,7 +131,7 @@ class ebooks(Star):
 
             return results[:limit]
         except ET.ParseError as e:
-            logger.error(f"解析 Calibre-Web 响应失败: {e}")
+            logger.error(f"解析 opds 响应失败: {e}")
             return None
 
     async def _show_calibre_result(self, event: AstrMessageEvent, results: list, guidance: str = None):

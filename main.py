@@ -26,9 +26,9 @@ class ebooks(Star):
         self.zlibrary = Zlibrary(email=config["zlib_email"], password=config["zlib_password"])
         self.zlibrary.login(email=config["zlib_email"], password=config["zlib_password"])
 
-    async def _search_opds_call(self, query: str, limit: int = None):
+    async def _search_calibre_web(self, query: str, limit: int = None):
         '''Call the OPDS Catalog API to search for eBooks.'''
-        opds_url = self.config.get("calibre_url", "http://127.0.0.1:8083")
+        opds_url = self.config.get("calibre_web_url", "http://127.0.0.1:8083")
         search_url = f"{opds_url}/opds/search/{query}"  # 根据实际路径构造 API URL
 
         async with aiohttp.ClientSession() as session:
@@ -208,7 +208,7 @@ class ebooks(Star):
             return
 
         try:
-            results = await self._search_opds_call(quote_plus(query))  # 调用搜索方法
+            results = await self._search_calibre_web(quote_plus(query))  # 调用搜索方法
             if not results or len(results) == 0:
                 yield event.plain_result("未找到相关的电子书。")
             else:
@@ -217,25 +217,6 @@ class ebooks(Star):
         except Exception as e:
             logger.error(f"OPDS搜索失败: {e}")
             yield event.plain_result("搜索过程中出现错误，请稍后重试。")
-
-    @calibre.command("help")
-    async def show_help(self, event: AstrMessageEvent):
-        '''显示 OPDS 插件帮助信息'''
-        help_msg = [
-            "📚 ebooks 插件使用指南",
-            "该插件通过标准的 OPDS 协议与电子书目录交互，支持搜索、下载和推荐功能。",
-            "",
-            "🔧 **命令列表**:",
-            "- `/opds search [关键词]`：搜索 OPDS 目录中的电子书。例如：`/opds search Python`。",
-            "- `/opds download [下载链接/书名]`：通过 OPDS 直接下载电子书。例如：`/opds download http://example.com/path/to/book`。",
-            "- `/opds recommend [数量]`：随机推荐指定数量的电子书。例如：`/opds recommend 5`。",
-            "- `/opds help`：显示当前插件的帮助信息（即此内容）。",
-            "",
-            "📒 **注意事项**:",
-            "- 下载指令支持直接输入电子书的下载链接或通过精确书名匹配来下载。",
-            "- 使用推荐功能时，插件会从现有书目中随机选择电子书。",
-        ]
-        yield event.plain_result("\n".join(help_msg))
 
     @calibre.command("download")
     async def download(self, event: AstrMessageEvent, ebook_url: str = None):
@@ -287,7 +268,7 @@ class ebooks(Star):
         try:
             # 调用 OPDS 搜索接口，默认搜索所有电子书
             query = "*"  # 空查询，可以调出完整书目
-            results = await self._search_opds_call(query)
+            results = await self._search_calibre_web(query)
 
             # 检查是否有电子书可供推荐
             if not results:
@@ -341,7 +322,7 @@ class ebooks(Star):
                 ebook_url = book_identifier
             else:
                 # Search the book by name
-                results = await self._search_opds_call(quote_plus(book_identifier))
+                results = await self._search_calibre_web(quote_plus(book_identifier))
                 matched_books = [
                     book for book in results if book_identifier.lower() in book["title"].lower()
                 ]
@@ -917,3 +898,36 @@ class ebooks(Star):
         """
         async for result in self.download_zlib(event, book_id, book_hash):
             yield result
+    
+    @command_group("ebooks")
+    def ebooks(self):
+        pass
+    
+    @ebooks.command("help")
+    async def show_help(self, event: AstrMessageEvent):
+        '''显示 OPDS 插件帮助信息'''
+        help_msg = [
+            "📚 ebooks 插件使用指南",
+            "该插件支持通过多个平台（如 OPDS、Z-Library、Archive）搜索、下载和推荐电子书。",
+            "",
+            "🔧 **命令列表**:",
+            "- `/calibre search [关键词]`：搜索 Calibre-Web 中的电子书。例如：`/calibre search Python`。",
+            "- `/calibre download [下载链接/书名]`：通过 Calibre-Web 下载电子书。例如：`/calibre download <URL>`。",
+            "- `/calibre recommend [数量]`：随机推荐指定数量的电子书。例如：`/calibre recommend 5`。",
+            "- `/archive search [关键词] [数量(可选)]`：搜索 Archive 上的电子书。例如：`/archive search Python (10)`。",
+            "- `/archive download [下载链接]`：通过 Archive 平台下载电子书。例如：`/archive download <URL>`。",
+            "- `/zlib search [关键词] [数量(可选)]`：搜索 Z-Library 的电子书。例如：`/zlib search Python (10)`。",
+            "- `/zlib download [ID] [Hash]`：通过 Z-Library 平台下载电子书。例如：`/zlib download 12345 abcde12345`。",
+            "- `/ebooks help`：显示当前插件的帮助信息（即此内容）。",
+            "",
+            "📒 **注意事项**:",
+            "- 下载指令要求提供有效的链接或 ID 和 Hash 值（适用于 Z-Library）。",
+            "- 推荐功能会从现有书目中随机选择书籍进行展示。",
+            "- 返回结果数量需在 1 到 50 之间以避免生成转发消息失败。",
+            "",
+            "🌐 **支持平台**:",
+            "- Calibre-Web",
+            "- Z-Library",
+            "- Archive.org",
+        ]
+        yield event.plain_result("\n".join(help_msg))

@@ -727,9 +727,25 @@ class ebooks(Star):
                             parsed_url = urlparse(ebook_url)
                             book_name = os.path.basename(parsed_url.path) or "unknown_book"
 
-                        # 将临时文件路径传递给 File
-                        file = File(name=book_name, file=ebook_url)
+                        # 构造临时文件路径
+                        temp_file_path = os.path.join(TEMP_PATH, book_name)
+
+                        # 保存下载文件到本地
+                        async with aiofiles.open(temp_file_path, "wb") as temp_file:
+                            await temp_file.write(await response.read())
+
+                        # 打印日志确认保存成功
+                        logger.info(f"文件已下载并保存到临时目录：{temp_file_path}")
+
+                        # 直接传递本地文件路径
+                        file = File(name=book_name, file=temp_file_path)
                         yield event.chain_result([file])
+                        os.remove(temp_file_path)
+
+
+                        # # 将临时文件路径传递给 File
+                        # file = File(name=book_name, file=ebook_url)
+                        # yield event.chain_result([file])
                     else:
                         yield event.plain_result(f"无法下载电子书，状态码: {response.status}")
         except Exception as e:

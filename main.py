@@ -563,7 +563,7 @@ class ebooks(Star):
 
         async with aiohttp.ClientSession() as session:
             # 1. 调用 Archive 搜索 API
-            response = await session.get(base_search_url, params=params)
+            response = await session.get(base_search_url, params=params, proxy=self.proxy)
             if response.status != 200:
                 logger.error(f"搜索 Archive 出现错误，状态码: {response.status}")
                 return []
@@ -602,7 +602,7 @@ class ebooks(Star):
                 dict: 包含下载链接、文件类型、封面和简介的字典
             """
         try:
-            response = await session.get(url)
+            response = await session.get(url, proxy=self.proxy)
             if response.status != 200:
                 logger.error(f"获取 Metadata 数据失败，状态码: {response.status}")
                 return {}
@@ -701,7 +701,7 @@ class ebooks(Star):
         try:
             async with aiohttp.ClientSession() as session:
                 # 发出 GET 请求并跟随跳转
-                async with session.get(download_url, allow_redirects=True) as response:
+                async with session.get(download_url, allow_redirects=True, proxy=self.proxy) as response:
                     if response.status == 200:
                         # 打印跳转后的最终地址
                         ebook_url = str(response.url)

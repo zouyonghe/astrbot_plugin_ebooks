@@ -27,9 +27,9 @@ class ebooks(Star):
         self.zlibrary.login(email=config["zlib_email"], password=config["zlib_password"])
 
     async def _search_calibre_web(self, query: str, limit: int = None):
-        '''Call the OPDS Catalog API to search for eBooks.'''
-        opds_url = self.config.get("calibre_web_url", "http://127.0.0.1:8083")
-        search_url = f"{opds_url}/opds/search/{query}"  # 根据实际路径构造 API URL
+        '''Call the Calibre-Web Catalog API to search for eBooks.'''
+        calibre_web_url = self.config.get("calibre_web_url", "http://127.0.0.1:8083")
+        search_url = f"{calibre_web_url}/Calibre-Web/search/{query}"  # 根据实际路径构造 API URL
 
         async with aiohttp.ClientSession() as session:
             async with session.get(search_url) as response:
@@ -42,12 +42,12 @@ class ebooks(Star):
                         logger.error(f"Unexpected content type: {content_type}")
                         return None
                 else:
-                    logger.error(f"OPDS搜索失败，状态码: {response.status}")
+                    logger.error(f"Calibre-Web搜索失败，状态码: {response.status}")
                     return None
 
     def _parse_opds_response(self, xml_data: str, limit: int = None):
-        '''Parse the OPDS search result XML data.'''
-        opds_url = self.config.get("opds_url", "http://127.0.0.1:8083")
+        '''Parse the Calibre-Web search result XML data.'''
+        calibre_web_url = self.config.get("calibre_web_url", "http://127.0.0.1:8083")
 
         # Remove illegal characters
         xml_data = re.sub(r'[^\x09\x0A\x0D\x20-\uD7FF\uE000-\uFFFD]', '', xml_data)
@@ -84,28 +84,28 @@ class ebooks(Star):
                 lang_element = entry.find("default:dcterms:language", namespace)
                 language = lang_element.text if lang_element is not None else "未知语言"
 
-                # 提取图书封面链接（rel="http://opds-spec.org/image"）
-                cover_element = entry.find("default:link[@rel='http://opds-spec.org/image']", namespace)
+                # 提取图书封面链接（rel="http://Calibre-Web-spec.org/image"）
+                cover_element = entry.find("default:link[@rel='http://Calibre-Web-spec.org/image']", namespace)
                 cover_suffix = cover_element.attrib.get("href", "") if cover_element is not None else ""
-                if cover_suffix and re.match(r"^/opds/cover/\d+$", cover_suffix):
-                    cover_link = urljoin(opds_url, cover_suffix)
+                if cover_suffix and re.match(r"^/Calibre-Web/cover/\d+$", cover_suffix):
+                    cover_link = urljoin(calibre_web_url, cover_suffix)
                 else:
                     cover_link = ""
 
-                # 提取图书缩略图链接（rel="http://opds-spec.org/image/thumbnail"）
-                thumbnail_element = entry.find("default:link[@rel='http://opds-spec.org/image/thumbnail']", namespace)
+                # 提取图书缩略图链接（rel="http://Calibre-Web-spec.org/image/thumbnail"）
+                thumbnail_element = entry.find("default:link[@rel='http://Calibre-Web-spec.org/image/thumbnail']", namespace)
                 thumbnail_suffix = thumbnail_element.attrib.get("href", "") if thumbnail_element is not None else ""
-                if thumbnail_suffix and re.match(r"^/opds/cover/\d+$", thumbnail_suffix):
-                    thumbnail_link = urljoin(opds_url, thumbnail_suffix)
+                if thumbnail_suffix and re.match(r"^/Calibre-Web/cover/\d+$", thumbnail_suffix):
+                    thumbnail_link = urljoin(calibre_web_url, thumbnail_suffix)
                 else:
                     thumbnail_link = ""
 
-                # 提取下载链接及其格式（rel="http://opds-spec.org/acquisition"）
-                acquisition_element = entry.find("default:link[@rel='http://opds-spec.org/acquisition']", namespace)
+                # 提取下载链接及其格式（rel="http://Calibre-Web-spec.org/acquisition"）
+                acquisition_element = entry.find("default:link[@rel='http://Calibre-Web-spec.org/acquisition']", namespace)
                 if acquisition_element is not None:
                     download_suffix = acquisition_element.attrib.get("href", "") if acquisition_element is not None else ""
-                    if download_suffix and re.match(r"^/opds/download/\d+/[\w]+/$", download_suffix):
-                        download_link = urljoin(opds_url, download_suffix)
+                    if download_suffix and re.match(r"^/Calibre-Web/download/\d+/[\w]+/$", download_suffix):
+                        download_link = urljoin(calibre_web_url, download_suffix)
                     else:
                         download_link = ""
                     file_type = acquisition_element.attrib.get("type", "未知格式")
@@ -131,10 +131,10 @@ class ebooks(Star):
 
             return results[:limit]
         except ET.ParseError as e:
-            logger.error(f"解析 OPDS 响应失败: {e}")
+            logger.error(f"解析 Calibre-Web 响应失败: {e}")
             return None
 
-    async def _show_opds_result(self, event: AstrMessageEvent, results: list, guidance: str = None):
+    async def _show_calibre_result(self, event: AstrMessageEvent, results: list, guidance: str = None):
         if not results:
             yield event.plain_result("未找到相关的电子书。")
 
@@ -154,7 +154,7 @@ class ebooks(Star):
         else:
             ns = Nodes([])
             if guidance:
-                ns.nodes.append(Node(uin=event.get_self_id(), name="OPDS", content=guidance))
+                ns.nodes.append(Node(uin=event.get_self_id(), name="Calibre-Web", content=guidance))
             for idx, item in enumerate(results):
                 chain = [Plain(f"{item['title']}")]
                 if item.get("cover_link"):
@@ -167,7 +167,7 @@ class ebooks(Star):
 
                 node = Node(
                     uin=event.get_self_id(),
-                    name="OPDS",
+                    name="Calibre-Web",
                     content=chain
                 )
                 ns.nodes.append(node)
@@ -212,15 +212,15 @@ class ebooks(Star):
             if not results or len(results) == 0:
                 yield event.plain_result("未找到相关的电子书。")
             else:
-                async for result in self._show_opds_result(event, results):
+                async for result in self._show_calibre_result(event, results):
                     yield result
         except Exception as e:
-            logger.error(f"OPDS搜索失败: {e}")
+            logger.error(f"Calibre-Web 搜索失败: {e}")
             yield event.plain_result("搜索过程中出现错误，请稍后重试。")
 
     @calibre.command("download")
     async def download(self, event: AstrMessageEvent, ebook_url: str = None):
-        '''通过 OPDS 协议下载 calibre-web 电子书'''
+        '''下载 calibre-web 电子书'''
         if not ebook_url:
             yield event.plain_result("请输入电子书的下载链接。")
             return
@@ -266,7 +266,7 @@ class ebooks(Star):
     async def recommend_calibre(self, event: AstrMessageEvent, n: int):
         '''随机推荐 n 本电子书'''
         try:
-            # 调用 OPDS 搜索接口，默认搜索所有电子书
+            # 调用 Calibre-Web 搜索接口，默认搜索所有电子书
             query = "*"  # 空查询，可以调出完整书目
             results = await self._search_calibre_web(query)
 
@@ -284,7 +284,7 @@ class ebooks(Star):
 
             # 显示推荐电子书
             guidance = f"如下是随机推荐的 {n} 本电子书"
-            async for result in self._show_opds_result(event, recommended_books, guidance):
+            async for result in self._show_calibre_result(event, recommended_books, guidance):
                 yield result
 
         except Exception as e:
@@ -293,13 +293,13 @@ class ebooks(Star):
 
     @llm_tool("search_calibre_books")
     async def search_calibre_books(self, event: AstrMessageEvent, query: str):
-        """Search books by keywords or title through OPDS.
+        """Search books by keywords or title through Calibre-Web.
         When to use:
-            Use this method to search for books in the OPDS catalog when user knows the title or keyword.
+            Use this method to search for books in the Calibre-Web catalog when user knows the title or keyword.
             This method cannot be used for downloading books and should only be used for searching purposes.
     
         Args:
-            query (string): The search keyword or title to find books in the OPDS catalog.
+            query (string): The search keyword or title to find books in the Calibre-Web catalog.
     
         """
         async for result in self.search_calibre(event, query):
@@ -307,7 +307,7 @@ class ebooks(Star):
 
     @llm_tool("download_calibre_book")
     async def download_calibre_book(self, event: AstrMessageEvent, book_identifier: str):
-        """Download a book by a precise name or URL through OPDS.
+        """Download a book by a precise name or URL through Calibre-Web.
         When to use:
             Use this method to download a specific book by its name or when a direct download link is available.
     
@@ -330,7 +330,7 @@ class ebooks(Star):
                 if len(matched_books) == 1:
                     ebook_url = matched_books[0]["download_link"]
                 elif len(matched_books) > 1:
-                    async for result in self._show_opds_result(event, results, guidance="请使用链接下载电子书。\n"):
+                    async for result in self._show_calibre_result(event, results, guidance="请使用链接下载电子书。\n"):
                         yield result
                 else:
                     yield event.plain_result("未能找到匹配的电子书，请提供准确书名或电子书下载链接。")
@@ -905,10 +905,10 @@ class ebooks(Star):
     
     @ebooks.command("help")
     async def show_help(self, event: AstrMessageEvent):
-        '''显示 OPDS 插件帮助信息'''
+        '''显示 Calibre-Web 插件帮助信息'''
         help_msg = [
             "📚 ebooks 插件使用指南",
-            "该插件支持通过多个平台（如 OPDS、Z-Library、Archive）搜索、下载和推荐电子书。",
+            "该插件支持通过多个平台（如 Calibre-Web、Z-Library、Archive）搜索、下载和推荐电子书。",
             "",
             "🔧 **命令列表**:",
             "- `/calibre search [关键词]`：搜索 Calibre-Web 中的电子书。例如：`/calibre search Python`。",

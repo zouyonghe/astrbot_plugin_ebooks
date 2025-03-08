@@ -798,7 +798,6 @@ class ebooks(Star):
             ns = Nodes([])
 
             for index, book in enumerate(books, start=1):
-                logger.info(book)
                 book_id = book.get("id")
                 chain = [Plain(f"标题: {book.get('title', '未知')}\n")]
                 if book.get("cover"):
@@ -908,16 +907,18 @@ class ebooks(Star):
         '''显示 Calibre-Web 插件帮助信息'''
         help_msg = [
             "📚 ebooks 插件使用指南",
-            "该插件支持通过多个平台（如 Calibre-Web、Z-Library、Archive）搜索、下载和推荐电子书。",
+            "支持通过多平台（Calibre-Web、Liber3、Z-Library、Archive）搜索、下载电子书。",
             "",
             "🔧 **命令列表**:",
-            "- `/calibre search [关键词]`：搜索 Calibre-Web 中的电子书。例如：`/calibre search Python`。",
-            "- `/calibre download [下载链接/书名]`：通过 Calibre-Web 下载电子书。例如：`/calibre download <URL>`。",
-            "- `/calibre recommend [数量]`：随机推荐指定数量的电子书。例如：`/calibre recommend 5`。",
-            "- `/archive search [关键词] [数量(可选)]`：搜索 Archive 上的电子书。例如：`/archive search Python (10)`。",
+            "- `/calibre search <关键词>`：搜索 Calibre-Web 中的电子书。例如：`/calibre search Python`。",
+            "- `/calibre download <下载链接/书名>`：通过 Calibre-Web 下载电子书。例如：`/calibre download <URL>`。",
+            "- `/calibre recommend <数量>`：随机推荐指定数量的电子书。例如：`/calibre recommend 5`。",
+            "- `/archive search <关键词> [数量(可选)]`：搜索 Archive 上的电子书。例如：`/archive search Python (10)`。",
             "- `/archive download [下载链接]`：通过 Archive 平台下载电子书。例如：`/archive download <URL>`。",
-            "- `/zlib search [关键词] [数量(可选)]`：搜索 Z-Library 的电子书。例如：`/zlib search Python (10)`。",
-            "- `/zlib download [ID] [Hash]`：通过 Z-Library 平台下载电子书。例如：`/zlib download 12345 abcde12345`。",
+            "- `/zlib search <关键词> [数量(可选)]`：搜索 Z-Library 的电子书。例如：`/zlib search Python (10)`。",
+            "- `/zlib download <ID> <Hash>`：通过 Z-Library 平台下载电子书。例如：`/zlib download 12345 abcde12345`。",
+            "- `/liber3 search <关键词>`：搜索 Liber3 平台上的电子书。例如：`/liber3 search Python`。",
+            "- `/liber3 download <ID>`：通过 Liber3 平台下载电子书，需要提供对应电子书的 ID。例如：`/liber3 download 12345`。",
             "- `/ebooks help`：显示当前插件的帮助信息（即此内容）。",
             "",
             "📒 **注意事项**:",
@@ -927,6 +928,7 @@ class ebooks(Star):
             "",
             "🌐 **支持平台**:",
             "- Calibre-Web",
+            "- Liber3",
             "- Z-Library",
             "- Archive.org",
         ]

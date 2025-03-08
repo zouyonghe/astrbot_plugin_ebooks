@@ -9,7 +9,7 @@ import aiofiles
 import aiohttp
 from bs4 import BeautifulSoup
 
-from Zlibrary import Zlibrary
+from data.plugins.astrbot_plugin_ebooks.Zlibrary import Zlibrary
 from astrbot.api.all import *
 from astrbot.api.event.filter import *
 

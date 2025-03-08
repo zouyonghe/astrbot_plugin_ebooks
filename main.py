@@ -841,7 +841,6 @@ class ebooks(Star):
         try:
             # 获取电子书详情，确保 ID 合法
             book_details = self.zlibrary.getBookInfo(book_id, hashid=book_hash)
-            logger.info(book_details)
             if not book_details:
                 yield event.plain_result("无法获取电子书详情，请检查电子书 ID 是否正确。")
                 return

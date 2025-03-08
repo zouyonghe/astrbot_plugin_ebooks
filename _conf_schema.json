@@ -1,8 +1,18 @@
 {
-    "opds_url": {
+    "calibre_web_url": {
         "type": "string",
-        "description": "OPDS 协议地址",
+        "description": "calibre-web 地址",
         "default": "http://127.0.0.1:8083",
-        "hint": "例如在同主机安装的 calibre-web，它的默认 OPDS 地址为 127.0.0.1:8083"
+        "hint": "例如在同主机安装的 calibre-web，地址为 http://127.0.0.1:8083"
+    },
+    "zlib_email": {
+        "type": "string",
+        "description": "Z-Library 登录邮箱",
+        "hint": "登录 Z-Library 的邮箱"
+    },
+    "zlib_password": {
+        "type": "string",
+        "description": "Z-Library 登录密码",
+        "hint": "登录 Z-Library 的密码"
     }
 }

@@ -9,10 +9,10 @@ import aiofiles
 import aiohttp
 from bs4 import BeautifulSoup
 
+from Zlibrary import Zlibrary
 from astrbot.api.all import *
 from astrbot.api.event.filter import *
 
-TEMP_PATH = os.path.abspath("data/temp")
 
 @register("ebooks", "buding", "一个功能强大的电子书搜索和下载插件", "1.0.0", "https://github.com/zouyonghe/astrbot_plugin_ebooks")
 class ebooks(Star):
@@ -20,11 +20,15 @@ class ebooks(Star):
         super().__init__(context)
         self.config = config
         self.proxy = os.environ.get("https_proxy")
-        os.makedirs(TEMP_PATH, exist_ok=True)
+        self.TEMP_PATH = os.path.abspath("data/temp")
+        os.makedirs(self.TEMP_PATH, exist_ok=True)
+
+        self.zlibrary = Zlibrary(email=config["zlib_email"], password=config["zlib_password"])
+        self.zlibrary.login(email=config["zlib_email"], password=config["zlib_password"])
 
     async def _search_opds_call(self, query: str, limit: int = None):
-        '''调用 OPDS 目录 API 进行电子书搜索'''
-        opds_url = self.config.get("opds_url", "http://127.0.0.1:8083")
+        '''Call the OPDS Catalog API to search for eBooks.'''
+        opds_url = self.config.get("calibre_url", "http://127.0.0.1:8083")
         search_url = f"{opds_url}/opds/search/{query}"  # 根据实际路径构造 API URL
 
         async with aiohttp.ClientSession() as session:
@@ -42,10 +46,10 @@ class ebooks(Star):
                     return None
 
     def _parse_opds_response(self, xml_data: str, limit: int = None):
-        '''解析 OPDS 搜索结果 XML 数据'''
+        '''Parse the OPDS search result XML data.'''
         opds_url = self.config.get("opds_url", "http://127.0.0.1:8083")
 
-        # 移除非法字符
+        # Remove illegal characters
         xml_data = re.sub(r'[^\x09\x0A\x0D\x20-\uD7FF\uE000-\uFFFD]', '', xml_data)
         # 消除多余空格
         xml_data = re.sub(r'\s+', ' ', xml_data)
@@ -57,7 +61,7 @@ class ebooks(Star):
 
             results = []
             for entry in entries:
-                # 提取书籍标题
+                # 提取电子书标题
                 title_element = entry.find("default:title", namespace)
                 title = title_element.text if title_element is not None else "未知标题"
 
@@ -192,13 +196,13 @@ class ebooks(Star):
 
         return "\n\n".join(result_strings)
 
-    @command_group("opds")
-    def opds(self):
+    @command_group("calibre")
+    def calibre(self):
         pass
 
-    @opds.command("search")
-    async def search_opds(self, event: AstrMessageEvent, query: str=None):
-        '''搜索 OPDS 电子书目录'''
+    @calibre.command("search")
+    async def search_calibre(self, event: AstrMessageEvent, query: str=None):
+        '''搜索 calibre-web 电子书目录'''
         if not query:
             yield event.plain_result("请输入搜索关键词。")
             return
@@ -214,11 +218,11 @@ class ebooks(Star):
             logger.error(f"OPDS搜索失败: {e}")
             yield event.plain_result("搜索过程中出现错误，请稍后重试。")
 
-    @opds.command("help")
+    @calibre.command("help")
     async def show_help(self, event: AstrMessageEvent):
         '''显示 OPDS 插件帮助信息'''
         help_msg = [
-            "📚 OPDS 插件使用指南",
+            "📚 ebooks 插件使用指南",
             "该插件通过标准的 OPDS 协议与电子书目录交互，支持搜索、下载和推荐功能。",
             "",
             "🔧 **命令列表**:",
@@ -229,13 +233,13 @@ class ebooks(Star):
             "",
             "📒 **注意事项**:",
             "- 下载指令支持直接输入电子书的下载链接或通过精确书名匹配来下载。",
-            "- 使用推荐功能时，插件会从现有书目中随机选择书籍。",
+            "- 使用推荐功能时，插件会从现有书目中随机选择电子书。",
         ]
         yield event.plain_result("\n".join(help_msg))
 
-    @opds.command("download")
+    @calibre.command("download")
     async def download(self, event: AstrMessageEvent, ebook_url: str = None):
-        '''通过 OPDS 协议下载电子书'''
+        '''通过 OPDS 协议下载 calibre-web 电子书'''
         if not ebook_url:
             yield event.plain_result("请输入电子书的下载链接。")
             return
@@ -277,37 +281,37 @@ class ebooks(Star):
             logger.error(f"下载失败: {e}")
             yield event.plain_result("下载过程中出现错误，请稍后重试。")
 
-    @opds.command("recommend")
-    async def recommend(self, event: AstrMessageEvent, n: int):
-        '''随机推荐 n 本书籍'''
+    @calibre.command("recommend")
+    async def recommend_calibre(self, event: AstrMessageEvent, n: int):
+        '''随机推荐 n 本电子书'''
         try:
-            # 调用 OPDS 搜索接口，默认搜索所有书籍
+            # 调用 OPDS 搜索接口，默认搜索所有电子书
             query = "*"  # 空查询，可以调出完整书目
             results = await self._search_opds_call(query)
 
-            # 检查是否有书籍可供推荐
+            # 检查是否有电子书可供推荐
             if not results:
                 yield event.plain_result("未找到任何可推荐的电子书。")
                 return
 
-            # 限制推荐数量，防止超出实际书籍数量
+            # 限制推荐数量，防止超出实际电子书数量
             if n > len(results):
                 n = len(results)
 
-            # 随机选择 n 本书籍
+            # 随机选择 n 本电子书
             recommended_books = random.sample(results, n)
 
-            # 显示推荐书籍
+            # 显示推荐电子书
             guidance = f"如下是随机推荐的 {n} 本电子书"
             async for result in self._show_opds_result(event, recommended_books, guidance):
                 yield result
 
         except Exception as e:
-            logger.error(f"推荐书籍时发生错误: {e}")
-            yield event.plain_result("推荐随机书籍时出现错误，请稍后重试。")
+            logger.error(f"推荐电子书时发生错误: {e}")
+            yield event.plain_result("推荐随机电子书时出现错误，请稍后重试。")
 
-    @llm_tool("opds_search_books")
-    async def search_books(self, event: AstrMessageEvent, query: str):
+    @llm_tool("search_calibre_books")
+    async def search_calibre_books(self, event: AstrMessageEvent, query: str):
         """Search books by keywords or title through OPDS.
         When to use:
             Use this method to search for books in the OPDS catalog when user knows the title or keyword.
@@ -317,11 +321,11 @@ class ebooks(Star):
             query (string): The search keyword or title to find books in the OPDS catalog.
     
         """
-        async for result in self.search_opds(event, query):
+        async for result in self.search_calibre(event, query):
             yield result
 
-    @llm_tool("opds_download_book")
-    async def download_book(self, event: AstrMessageEvent, book_identifier: str):
+    @llm_tool("download_calibre_book")
+    async def download_calibre_book(self, event: AstrMessageEvent, book_identifier: str):
         """Download a book by a precise name or URL through OPDS.
         When to use:
             Use this method to download a specific book by its name or when a direct download link is available.
@@ -353,23 +357,23 @@ class ebooks(Star):
             async for result in self.download(event, ebook_url):
                 yield result
         except Exception as e:
-            logger.error(f"处理书籍接收过程中出现错误: {e}")
+            logger.error(f"处理电子书接收过程中出现错误: {e}")
             yield event.plain_result("处理请求时发生错误，请稍后重试或检查输入是否正确。")
 
-    @llm_tool("opds_recommend_books")
-    async def recommend_books(self, event: AstrMessageEvent, n: str = "5"):
-        """Randomly recommend n books from the OPDS catalog.
+    @llm_tool("recommend_books")
+    async def recommend_calibre_books(self, event: AstrMessageEvent, n: str = "5"):
+        """Randomly recommend n books.
         When to use:
             Use this method to get a random selection of books when users are unsure what to read.
     
         Args:
             n (string): Number of books to recommend (default is 5).
         """
-        async for result in self.recommend(event, int(n)):
+        async for result in self.recommend_calibre(event, int(n)):
             yield result
             
     async def get_liber3_book_details(self, book_ids: list) -> Optional[dict]:
-        """通过书籍 ID 获取详细信息"""
+        """通过电子书 ID 获取详细信息"""
         detail_url = "https://lgate.glitternode.ru/v1/book"
         headers = {"Content-Type": "application/json"}
         payload = {"book_ids": book_ids}
@@ -381,7 +385,7 @@ class ebooks(Star):
                         data = await response.json()
                         return data.get("data", {}).get("book", {})
                     else:
-                        logger.error(f"请求书籍详细信息失败，状态码: {response.status}")
+                        logger.error(f"请求电子书详细信息失败，状态码: {response.status}")
                         return None
         except aiohttp.ClientError as e:
             logger.error(f"HTTP 客户端错误: {e}")
@@ -391,7 +395,7 @@ class ebooks(Star):
         return None
     
     async def search_liber3_books_with_details(self, word: str) -> Optional[dict]:
-        """搜索书籍并获取前 50 本书籍的详细信息"""
+        """搜索电子书并获取前 50 本电子书的详细信息"""
         search_url = "https://lgate.glitternode.ru/v1/searchV2"
         headers = {"Content-Type": "application/json"}
         payload = {
@@ -405,21 +409,21 @@ class ebooks(Star):
                     if response.status == 200:
                         data = await response.json()
 
-                        # 获取书籍 ID 列表
+                        # 获取电子书 ID 列表
                         book_data = data["data"].get("book", [])
                         if not book_data:
-                            logger.info("未找到相关书籍。")
+                            logger.info("未找到相关电子书。")
                             return None
 
-                        book_ids = [item.get("id") for item in book_data[:50]]  # 获取前 50 本书籍的 ID
+                        book_ids = [item.get("id") for item in book_data[:50]]  # 获取前 50 本电子书的 ID
                         if not book_ids:
-                            logger.info("未能提取书籍 ID。")
+                            logger.info("未能提取电子书 ID。")
                             return None
 
                         # 调用详细信息 API
                         detailed_books = await self.get_liber3_book_details(book_ids)
                         if not detailed_books:
-                            logger.info("未获取书籍详细信息。")
+                            logger.info("未获取电子书详细信息。")
                             return None
 
                         # 返回包含搜索结果及详细信息的数据
@@ -429,7 +433,7 @@ class ebooks(Star):
                         }
 
                     else:
-                        logger.error(f"请求书籍搜索失败，状态码: {response.status}")
+                        logger.error(f"请求电子书搜索失败，状态码: {response.status}")
                         return None
         except aiohttp.ClientError as e:
             logger.error(f"HTTP 客户端错误: {e}")
@@ -444,16 +448,16 @@ class ebooks(Star):
 
     @liber3.command("search")
     async def search_liber3(self, event: AstrMessageEvent, query: str = None):
-        """搜索书籍并输出详细信息"""
+        """搜索电子书并输出详细信息"""
         if not query:
-            yield event.plain_result("请提供书籍关键词以进行搜索。")
+            yield event.plain_result("请提供电子书关键词以进行搜索。")
             return
 
         logger.info(f"Received book search query: {query}")
         results = await self.search_liber3_books_with_details(query)
 
         if not results:
-            yield event.plain_result("未找到相关书籍。")
+            yield event.plain_result("未找到相关电子书。")
             return
 
         # 输出搜索结果和详细信息
@@ -488,23 +492,23 @@ class ebooks(Star):
     @liber3.command("download")
     async def download_liber3(self, event: AstrMessageEvent, book_id: str = None):
         if not book_id:
-            yield event.plain_result("请提供有效的书籍 ID。")
+            yield event.plain_result("请提供有效的电子书 ID。")
             return
 
-        # 获取详细的书籍信息
+        # 获取详细的电子书信息
         book_details = await self.get_liber3_book_details([book_id])
         if not book_details or book_id not in book_details:
-            yield event.plain_result("无法获取书籍元信息，请检查书籍 ID 是否正确。")
+            yield event.plain_result("无法获取电子书元信息，请检查电子书 ID 是否正确。")
             return
 
-        # 提取书籍信息
+        # 提取电子书信息
         book_info = book_details[book_id].get("book", {})
         book_name = book_info.get("title", "unknown_book").replace(" ", "_")
         extension = book_info.get("extension", "unknown_extension")
         ipfs_cid = book_info.get("ipfs_cid", "")
 
         if not ipfs_cid or not extension:
-            yield event.plain_result("书籍信息不足，无法完成下载。")
+            yield event.plain_result("电子书信息不足，无法完成下载。")
             return
 
         # 构造下载链接
@@ -540,14 +544,14 @@ class ebooks(Star):
         async for result in self.download_liber3(event, book_id):
             yield result
 
-    async def search_archive_books(self, query: str, limit: int = 20):
-        """通过 archive API 搜索电子书，并筛选 PDF 或 EPUB 格式的文件。
+    async def _search_archive_books(self, query: str, limit: int = 20):
+        """Search for eBooks through the Archive API and filter files in PDF or EPUB formats.
             Args:
-                query (str): 搜索的标题关键字
-                limit (int): 返回的最多结果数量
+                query (str): Search keyword for titles
+                limit (int): Maximum number of results to return
             Returns:
-                list: 包含满足条件的书籍信息和下载链接的列表
-            """
+                list: A list containing book information and download links that meet the criteria
+        """
         base_search_url = "https://archive.org/advancedsearch.php"
         base_metadata_url = "https://archive.org/metadata/"
         formats = ("pdf", "epub")  # 支持的电子书格式
@@ -593,14 +597,15 @@ class ebooks(Star):
             return books
 
     async def _fetch_metadata(self, session: aiohttp.ClientSession, url: str, formats: tuple) -> dict:
-        """从 Metadata API 获取指定格式的电子书信息，同时提取封面和简介。
+        """
+            Retrieve specific eBook formats from the Metadata API and extract covers and descriptions.
             Args:
-                session (aiohttp.ClientSession): aiohttp 会话
-                url (str): Metadata API 的 URL
-                formats (tuple): 需要的文件格式（如 PDF, EPUB）
+                session (aiohttp.ClientSession): aiohttp session
+                url (str): URL of the Metadata API
+                formats (tuple): Required formats (e.g., PDF, EPUB)
             Returns:
-                dict: 包含下载链接、文件类型、封面和简介的字典
-            """
+                dict: A dictionary with download links, file type, cover, and description
+        """
         try:
             response = await session.get(url, proxy=self.proxy)
             if response.status != 200:
@@ -637,13 +642,13 @@ class ebooks(Star):
         return {}
 
     def _is_html(self, content):
-        """判断字符串是否为 HTML 格式"""
+        """Determine whether a string is in HTML format."""
         if not isinstance(content, str):
             return False
         return bool(re.search(r'<[^>]+>', content))
 
     def _parse_html_to_text(self, html_content):
-        """将 HTML 内容解析为纯文本"""
+        """Parse HTML content into plain text."""
         soup = BeautifulSoup(html_content, "html.parser")
         return soup.get_text().strip()
 
@@ -653,18 +658,23 @@ class ebooks(Star):
 
     @archive.command("search")
     async def search_archive(self, event: AstrMessageEvent, query: str = None, limit: str = "20"):
-        """通过 archive 平台搜索电子书，并过滤支持的格式。
+        """
+            Search for eBooks using the Archive platform, filtering for supported formats.
             Args:
-                query (str): 搜索的书籍标题或关键词（必须提供）
-                limit (str): 结果数量限制，默认为 20
-            """
+                query (str): The book title or keywords to search for (required).
+                limit (str): The result limit, default is 20.
+        """
         if not query:
             yield event.plain_result("请输入要搜索的标题或关键词。")
             return
 
         try:
-            limit = int(limit) if limit.isdigit() else 20  # 默认最多返回 20 个结果
-            results = await self.search_archive_books(query, limit)
+            limit = int(limit) if limit.isdigit() else 20
+            if not (1 <= limit <= 50):  # Validate limit
+                yield event.plain_result("请提供 1 到 50 之间的结果数。")
+                return
+
+            results = await self._search_archive_books(query, limit)
 
             if not results:
                 yield event.plain_result("未找到符合条件的电子书。")
@@ -689,10 +699,10 @@ class ebooks(Star):
             yield event.plain_result("搜索过程中发生错误，请稍后重试。")
 
     @archive.command("download")
-    async def download_archive_book(self, event: AstrMessageEvent, download_url: str = None):
-        """通过提供的链接下载 Archive 平台上的电子书。
+    async def download_archive(self, event: AstrMessageEvent, download_url: str = None):
+        """Download an eBook from the Archive platform using a provided link.
             Args:
-                download_url (str): 电子书的下载 URL
+                download_url (str): The download URL of the eBook.
         """
         if not download_url:
             yield event.plain_result("请提供有效的下载链接。")
@@ -728,7 +738,7 @@ class ebooks(Star):
                             book_name = os.path.basename(parsed_url.path) or "unknown_book"
 
                         # 构造临时文件路径
-                        temp_file_path = os.path.join(TEMP_PATH, book_name)
+                        temp_file_path = os.path.join(self.TEMP_PATH, book_name)
 
                         # 保存下载文件到本地
                         async with aiofiles.open(temp_file_path, "wb") as temp_file:
@@ -742,8 +752,6 @@ class ebooks(Star):
                         yield event.chain_result([file])
                         os.remove(temp_file_path)
 
-
-                        # # 将临时文件路径传递给 File
                         # file = File(name=book_name, file=ebook_url)
                         # yield event.chain_result([file])
                     else:
@@ -752,4 +760,160 @@ class ebooks(Star):
             logger.error(f"下载失败: {e}")
             yield event.plain_result(f"下载过程中发生错误：{e}")
 
+    @llm_tool("search_archive_books")
+    async def search_archive_books(self, event: AstrMessageEvent, query: str):
+        """Search for eBooks using the Archive API.
+    
+        When to use:
+            Utilize this method to search books available in supported formats (such as PDF or EPUB) on the Archive API platform.
+    
+        Args:
+            query (string): The keywords or title to perform the search.
+        """
+        async for result in self.search_archive(event, query):
+            yield result
 
+    @llm_tool("download_archive_book")
+    async def download_archive_book(self, event: AstrMessageEvent, download_url: str):
+        """Download an eBook from the Archive API using its download URL.
+    
+        When to use:
+            Use this method to download a specific book from the Archive platform using the book's provided download link.
+    
+        Args:
+            download_url (string): A valid and supported Archive book download URL.
+        """
+        async for result in self.download_archive(event, download_url):
+            yield result
+
+    @command_group("zlib")
+    def zlib(self):
+        pass
+
+    @zlib.command("search")
+    async def search_zlib(self, event: AstrMessageEvent, query: str = None, limit: str = "20"):
+        """搜索 Zlibrary 电子书并输出详细信息"""
+        if not query:
+            yield event.plain_result("请提供电子书关键词以进行搜索。")
+            return
+
+        try:
+            limit = int(limit)
+            if not (1 <= limit <= 50):  # Validate limit
+                yield event.plain_result("请提供 1 到 50 之间的结果数。")
+                return
+
+            logger.info(f"Received Zlibrary book search query: {query}")
+
+            # 调用 Zlibrary 的 search 方法进行搜索
+            results = self.zlibrary.search(message=query, limit=limit)
+
+            if not results or not results.get("books"):
+                yield event.plain_result("未找到相关电子书。")
+                return
+
+            # 处理搜索结果
+            books = results.get("books", [])
+            ns = Nodes([])
+
+            for index, book in enumerate(books, start=1):
+                logger.info(book)
+                book_id = book.get("id")
+                chain = [Plain(f"标题: {book.get('title', '未知')}\n")]
+                if book.get("cover"):
+                    chain.append(Image.fromURL(book["cover"]))
+                else:
+                    chain.append(Plain("\n"))
+                chain.append(Plain(f"作者: {book.get('author', '未知')}\n"))
+                chain.append(Plain(f"年份: {book.get('year', '未知')}\n"))
+                chain.append(Plain(f"出版社: {book.get('publisher', '未知')}\n"))
+                chain.append(Plain(f"语言: {book.get('language', '未知')}\n"))
+                description = book.get('description', '无简介')
+                if isinstance(description, str):
+                    description = description.strip()
+                    description = description[:200] + "..." if len(description) > 200 else description
+                else:
+                    description = "无简介"
+                chain.append(Plain(f"简介: {description}\n"))
+                chain.append(Plain(f"ID(用于下载): {book_id}\n"))
+                chain.append(Plain(f"哈希(用于下载): {book.get('hash')}"))
+
+                node = Node(
+                    uin=event.get_self_id(),
+                    name="Z-Library",
+                    content=chain,
+                )
+                ns.nodes.append(node)
+
+            yield event.chain_result([ns])
+
+        except Exception as e:
+            logger.error(f"搜索 Zlibrary 电子书时出错: {e}")
+            yield event.plain_result("搜索电子书时发生错误，请稍后再试。")
+
+    @zlib.command("download")
+    async def download_zlib(self, event: AstrMessageEvent, book_id: str = None, book_hash: str = None):
+        """下载 Z-Library 电子书"""
+        if not book_id or not book_hash:
+            yield event.plain_result("请使用 /zlib download <id> <hash> 下载。")
+            return
+
+        try:
+            # 获取电子书详情，确保 ID 合法
+            book_details = self.zlibrary.getBookInfo(book_id, hashid=book_hash)
+            logger.info(book_details)
+            if not book_details:
+                yield event.plain_result("无法获取电子书详情，请检查电子书 ID 是否正确。")
+                return
+
+            # 下载电子书
+            downloaded_book = self.zlibrary.downloadBook({"id": book_id, "hash": book_hash})
+            if downloaded_book:
+                book_name, book_content = downloaded_book
+                # 构造临时文件路径
+                temp_file_path = os.path.join(self.TEMP_PATH, book_name)
+
+                # 保存电子书文件
+                with open(temp_file_path, "wb") as file:
+                    file.write(book_content)
+
+                # 打印日志确认保存成功
+                logger.info(f"文件已下载并保存到临时目录：{temp_file_path}")
+
+                # 提醒用户下载完成
+                file = File(name=book_name, file=str(temp_file_path))
+                yield event.chain_result([file])
+                os.remove(temp_file_path)
+            else:
+                yield event.plain_result("下载失败，请检查提供的电子书信息。")
+
+        except Exception as e:
+            logger.error(f"下载 Z-Library 电子书时出错: {e}")
+            yield event.plain_result("下载电子书时发生错误，请稍后再试。")
+
+    @llm_tool("search_zlib_books")
+    async def search_zlib_books(self, event: AstrMessageEvent, query: str):
+        """Search Zlibrary for books using given keywords.
+
+        When to use:
+            Use this method to locate books by keywords or title in Z-Library's database.
+
+        Args:
+            query (string): The search term to perform the lookup.
+        """
+        async for result in self.search_zlib(event, query):
+            yield result
+
+    @llm_tool("download_zlib_book")
+    async def download_zlib_book(self, event: AstrMessageEvent, book_id: str, book_hash: str):
+        """Download a book from Z-Library using its book ID and hash.
+    
+        When to use:
+            Use this method for downloading books from Zlibrary with the provided ID and hash.
+    
+        Args:
+            book_id (string): The unique identifier for the book.
+            book_hash (string): Hash value required to authorize and retrieve the download.
+        """
+        async for result in self.download_zlib(event, book_id, book_hash):
+            yield result

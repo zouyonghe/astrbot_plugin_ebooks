@@ -151,7 +151,7 @@ class ebooks(Star):
 
     async def _show_calibre_result(self, event: AstrMessageEvent, results: list, guidance: str = None):
         if not results:
-            yield event.plain_result("未找到相关的电子书。")
+            yield event.plain_result("Calibre-Web 未找到匹配的电子书。")
 
         if len(results) == 1:
             item = results[0]
@@ -231,7 +231,7 @@ class ebooks(Star):
             logger.info(f"Received Calibre-Web books search query: {query}, limit: {limit}")
             results = await self._search_calibre_web(quote_plus(query), limit)  # 调用搜索方法
             if not results or len(results) == 0:
-                yield event.plain_result("未找到相关的电子书。")
+                yield event.plain_result("Calibre-Web 未找到匹配的电子书。")
             else:
                 async for result in self._show_calibre_result(event, results):
                     yield result
@@ -293,7 +293,7 @@ class ebooks(Star):
 
             # 检查是否有电子书可供推荐
             if not results:
-                yield event.plain_result("未找到任何可推荐的电子书。")
+                yield event.plain_result("Calibre-Web 未找到任何可推荐的电子书。")
                 return
 
             # 限制推荐数量，防止超出实际电子书数量
@@ -413,7 +413,7 @@ class ebooks(Star):
                         # 获取电子书 ID 列表
                         book_data = data["data"].get("book", [])
                         if not book_data:
-                            logger.info("未找到相关电子书。")
+                            logger.info("Liber3 未找到匹配的电子书。")
                             return None
 
                         book_ids = [item.get("id") for item in book_data[:limit]]
@@ -462,7 +462,7 @@ class ebooks(Star):
         results = await self.search_liber3_books_with_details(query, limit)
 
         if not results:
-            yield event.plain_result("未找到相关电子书。")
+            yield event.plain_result("Liber3 未找到匹配的电子书。")
             return
 
         # 输出搜索结果和详细信息
@@ -581,7 +581,7 @@ class ebooks(Star):
             result_data = await response.json()
             docs = result_data.get("response", {}).get("docs", [])
             if not docs:
-                logger.info("未找到与关键词匹配的电子书。")
+                logger.info("Archive.org 未找到匹配的电子书。")
                 return []
 
             # 2. 根据 identifier 提取元数据
@@ -683,7 +683,7 @@ class ebooks(Star):
             results = await self._search_archive_books(query, limit)
 
             if not results:
-                yield event.plain_result("未找到符合条件的电子书。")
+                yield event.plain_result("Archive.org 未找到匹配的电子书。")
                 return
 
             # 返回结果到用户
@@ -814,7 +814,7 @@ class ebooks(Star):
             results = self.zlibrary.search(message=query, limit=limit)
 
             if not results or not results.get("books"):
-                yield event.plain_result("未找到相关电子书。")
+                yield event.plain_result("Z-Library 未找到匹配的电子书。")
                 return
 
             # 处理搜索结果

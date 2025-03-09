@@ -1073,7 +1073,7 @@ class ebooks(Star):
 
         except Exception as e:
             # 捕获并处理运行时错误
-            yield event.plain_result(f"❌ 下载过程中发生错误：{e}")
+            yield event.plain_result(f"❌ 下载电子书时发生错误，请稍后再试。")
 
         @llm_tool("search_ebooks")
         async def search_ebooks(self, event: AstrMessageEvent, query: str):

@@ -1021,7 +1021,6 @@ class ebooks(Star):
         """
         自动解析并识别输入，调用对应的平台下载实现，完成电子书的下载和发送。
 
-        :param event: AstrMessageEvent 事件，处理用户请求和响应
         :param arg1: 主参数，可能是链接、ID 或其他标识符
         :param arg2: 可选参数，用于补充 Z-Library 下载中的 Hash 值
         """

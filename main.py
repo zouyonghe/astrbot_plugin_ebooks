@@ -35,10 +35,27 @@ class ebooks(Star):
         """
         try:
             async with aiohttp.ClientSession() as session:
-                async with session.head(url, timeout=1) as response:
+                async with session.head(url, timeout=3) as response:
                     return response.status == 200  # 返回状态是否为 200
         except:
             return False  # 如果请求失败（超时、连接中断等）则返回 False
+
+    async def download_and_convert_to_base64(self, cover_url):
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(cover_url) as response:
+                    if response.status == 200:
+                        # 读取响应内容
+                        content = await response.read()
+                        # 将图片内容转换为 Base64
+                        base64_data = base64.b64encode(content).decode("utf-8")
+                        return base64_data
+                    else:
+                        logger.error(f"Failed to download the cover. HTTP Status: {response.status}")
+                        return None
+        except Exception as e:
+            logger.error(f"An error occurred: {e}")
+            return None
 
     async def _search_calibre_web(self, query: str, limit: int = None):
         '''Call the Calibre-Web Catalog API to search for eBooks.'''
@@ -598,6 +615,8 @@ class ebooks(Star):
                 {
                     "title": doc.get("title"),
                     "authors": metadata.get("authors"),
+                    "cover": metadata.get("cover"),
+                    "language": metadata.get("language"),
                     "download_url": metadata.get("download_url"),
                     "description": metadata.get("description")
                 }
@@ -621,11 +640,13 @@ class ebooks(Star):
                 logger.error(f"[Archive] Error retrieving Metadata: Status code {response.status}")
                 return {}
 
-            metadata = await response.json()
-            identifier = metadata.get("metadata", {}).get("identifier", None)
-            files = metadata.get("files", [])
-            description = metadata.get("metadata", {}).get("description", None)
-            authors = metadata.get("metadata", {}).get("creator", None)
+            book_detail = await response.json()
+
+            identifier = book_detail.get("metadata", {}).get("identifier", None)
+            files = book_detail.get("files", [])
+            description = book_detail.get("metadata", {}).get("description", None)
+            authors = book_detail.get("metadata", {}).get("creator", None)
+            language = book_detail.get("metadata", {}).get("language", None)
 
             # 判断并解析简介
             if isinstance(description, str):
@@ -641,9 +662,11 @@ class ebooks(Star):
             for file in files:
                 if any(file.get("name", "").lower().endswith(fmt) for fmt in formats):
                     return {
+                        "cover": f"https://archive.org/services/img/{identifier}",
                         "download_url": f"https://archive.org/download/{identifier}/{file['name']}",
                         "description": description,
                         "authors": authors,
+                        "language": language,
                     }
 
         except Exception as e:
@@ -692,12 +715,16 @@ class ebooks(Star):
             # 返回结果到用户
             ns = Nodes([])
             for idx, book in enumerate(results, start=1):
-                chain = [
-                    Plain(f"{book['title']}\n"),
-                    Plain(f"作者: {book.get('authors')}\n"),
-                    Plain(f"简介: {book.get('description', '无简介')}\n"),
-                    Plain(f"链接(用于下载): {book.get('download_url', '未知')}")
-                ]
+                chain = [Plain(f"{book.get('title', '未知')}")]
+                if book.get("cover") and await self.is_url_accessible(book.get("cover")):
+                    chain.append(Image.fromBase64(await self.download_and_convert_to_base64(book.get("cover"))))
+                else:
+                    chain.append(Plain("\n"))
+                chain.append(Plain(f"作者: {book.get('authors', '未知')}\n"))
+                chain.append(Plain(f"语言: {book.get('language', '未知')}\n"))
+                chain.append(Plain(f"简介: {book.get('description', '无简介')}\n"))
+                chain.append(Plain(f"链接(用于下载): {book.get('download_url', '未知')}"))
+
                 node = Node(uin=event.get_self_id(), name="Archive", content=chain)
                 ns.nodes.append(node)
 
@@ -826,15 +853,15 @@ class ebooks(Star):
             for index, book in enumerate(books, start=1):
                 chain = [Plain(f"{book.get('title', '未知')}")]
                 if book.get("cover") and await self.is_url_accessible(book.get("cover")):
-                    chain.append(Image.fromURL(book.get("cover")))
+                    chain.append(Image.fromBase64(await self.download_and_convert_to_base64(book.get("cover"))))
                 else:
                     chain.append(Plain("\n"))
                 chain.append(Plain(f"作者: {book.get('author', '未知')}\n"))
                 chain.append(Plain(f"年份: {book.get('year', '未知')}\n"))
                 chain.append(Plain(f"出版社: {book.get('publisher', '未知')}\n"))
                 chain.append(Plain(f"语言: {book.get('language', '未知')}\n"))
-                description = book.get('description', '无简介')
-                if isinstance(description, str):
+                description = book.get("description", "无简介")
+                if isinstance(description, str) and description != "":
                     description = description.strip()
                     description = description[:150] + "..." if len(description) > 150 else description
                 else:

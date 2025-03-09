@@ -1030,38 +1030,36 @@ class ebooks(Star):
             return
 
         try:
+            # Z-Library 下载 (基于 ID 和 Hash)
+            if arg1 and arg2:  # 检查两个参数是否都存在
+                try:
+                    logger.info("⏳ 检测到 Z-Library ID 和 Hash，开始下载...")
+                    async for result in self.download_zlib(event, arg1, arg2):
+                        yield result
+                except Exception as e:
+                    yield event.plain_result(f"❌ Z-Library 参数解析失败：{e}")
+                return
+
             # Calibre-Web 下载 (基于 OPDS 链接)
             if arg1.startswith("http://") or arg1.startswith("https://"):
                 if "/opds/download/" in arg1:
-                    yield event.plain_result("⏳ 检测到 Calibre-Web 链接，开始下载...")
+                    logger.info("⏳ 检测到 Calibre-Web 链接，开始下载...")
                     async for result in self.download_calibre_book(event, arg1):
                         yield result
                     return
 
                 # Archive.org 下载
                 if "archive.org/download/" in arg1:
-                    yield event.plain_result("⏳ 检测到 Archive.org 链接，开始下载...")
+                    logger.info("⏳ 检测到 Archive.org 链接，开始下载...")
                     async for result in self.download_archive_book(event, arg1):
                         yield result
                     return
 
             # Liber3 下载
             if len(arg1) == 32 and re.match(r"^[A-Fa-f0-9]{32}$", arg1):  # 符合 Liber3 的 ID 格式
-                yield event.plain_result("⏳ 检测到 Liber3 ID，开始下载...")
+                logger.info("⏳ 检测到 Liber3 ID，开始下载...")
                 async for result in self.download_liber3_book(event, arg1):
                     yield result
-                return
-
-            # Z-Library 下载 (基于 ID 和 Hash)
-            if arg1 and arg2:  # 检查两个参数是否都存在
-                try:
-                    zlib_id = arg1.strip()  # 第一个参数作为 ID
-                    zlib_hash = arg2.strip()  # 第二个参数作为 Hash
-                    yield event.plain_result("⏳ 检测到 Z-Library ID 和 Hash，开始下载...")
-                    async for result in self.download_zlib(event, zlib_id, zlib_hash):
-                        yield result
-                except Exception as e:
-                    yield event.plain_result(f"❌ Z-Library 参数解析失败：{e}")
                 return
 
             # 未知来源的输入

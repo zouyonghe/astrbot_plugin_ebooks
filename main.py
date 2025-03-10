@@ -247,27 +247,20 @@ class ebooks(Star):
             yield event.plain_result("[Calibre-Web] 未找到匹配的电子书。")
             return
 
-        if len(results) == 1:
-            # 单条结果，直接构建并返回
-            item = results[0]
+        ns = Nodes([])
+        if guidance:
+            ns.nodes.append(Node(uin=event.get_self_id(), name="Calibre-Web", content=guidance))
+
+        for item in results:
             chain = await self.build_book_chain(item)
-            yield event.chain_result(chain)
-        else:
-            # 多条结果，生成节点列表
-            ns = Nodes([])
-            if guidance:
-                ns.nodes.append(Node(uin=event.get_self_id(), name="Calibre-Web", content=guidance))
+            node = Node(
+                uin=event.get_self_id(),
+                name="Calibre-Web",
+                content=chain
+            )
+            ns.nodes.append(node)
 
-            for item in results:
-                chain = await self.build_book_chain(item)
-                node = Node(
-                    uin=event.get_self_id(),
-                    name="Calibre-Web",
-                    content=chain
-                )
-                ns.nodes.append(node)
-
-            yield event.chain_result([ns])
+        yield event.chain_result([ns])
 
     @command_group("calibre")
     def calibre(self):

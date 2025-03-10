@@ -6,6 +6,7 @@ Zlibrary-API / Zlibrary.py
 For more information, see:
 https://github.com/bipinkrish/Zlibrary-API/
 """
+import os
 
 import requests
 
@@ -35,6 +36,12 @@ class Zlibrary:
         self.__cookies = {
             "siteLanguageV2": "en",
         }
+        proxy = os.environ.get("https_proxy")
+        if proxy:
+            self.proxies = {
+                "http": proxy,
+                "https": proxy,
+            }
 
         if email is not None and password is not None:
             self.login(email, password)
@@ -98,6 +105,7 @@ class Zlibrary:
             data=data,
             cookies=self.__cookies,
             headers=self.__headers,
+            proxies=self.proxies,
         ).json()
 
     def __makeGetRequest(
@@ -112,6 +120,7 @@ class Zlibrary:
             params=params,
             cookies=self.__cookies if cookies is None else cookies,
             headers=self.__headers,
+            proxies=self.proxies,
         ).json()
 
     def getProfile(self) -> dict[str, str]:

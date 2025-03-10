@@ -68,8 +68,7 @@ class ebooks(Star):
                     content = await response.read()
                     base64_data = base64.b64encode(content).decode("utf-8")
                     return base64_data
-        except (ClientPayloadError, aiohttp.ContentLengthError) as payload_error:
-            logger.warning(f"Ignored ContentLengthError: {payload_error}")
+        except ClientPayloadError as payload_error:
             # 尝试已接收的数据部分
             if 'content' in locals():  # 如果部分内容已下载
                 base64_data = base64.b64encode(content).decode("utf-8")

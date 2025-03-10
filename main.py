@@ -35,7 +35,7 @@ class ebooks(Star):
         """
         try:
             async with aiohttp.ClientSession() as session:
-                async with session.head(url, timeout=3) as response:
+                async with session.head(url, timeout=3, proxy=self.proxy) as response:
                     return response.status == 200  # 返回状态是否为 200
         except:
             logger.error(f"Failed to check URL accessibility: {url}")
@@ -44,7 +44,7 @@ class ebooks(Star):
     async def download_and_convert_to_base64(self, cover_url):
         try:
             async with aiohttp.ClientSession() as session:
-                async with session.get(cover_url) as response:
+                async with session.get(cover_url, proxy=self.proxy) as response:
                     if response.status == 200:
                         # 读取响应内容
                         content = await response.read()

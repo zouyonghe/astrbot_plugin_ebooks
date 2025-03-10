@@ -717,7 +717,11 @@ class ebooks(Star):
             for idx, book in enumerate(results, start=1):
                 chain = [Plain(f"{book.get('title', '未知')}")]
                 if book.get("cover") and await self.is_url_accessible(book.get("cover")):
-                    chain.append(Image.fromBase64(await self.download_and_convert_to_base64(book.get("cover"))))
+                    base64_image = await self.download_and_convert_to_base64(book.get("cover"))
+                    if base64_image:
+                        chain.append(Image.fromBase64(base64_image))
+                    else:
+                        chain.append(Plain("\n"))
                 else:
                     chain.append(Plain("\n"))
                 chain.append(Plain(f"作者: {book.get('authors', '未知')}\n"))
@@ -853,7 +857,11 @@ class ebooks(Star):
             for index, book in enumerate(books, start=1):
                 chain = [Plain(f"{book.get('title', '未知')}")]
                 if book.get("cover") and await self.is_url_accessible(book.get("cover")):
-                    chain.append(Image.fromBase64(await self.download_and_convert_to_base64(book.get("cover"))))
+                    base64_image = await self.download_and_convert_to_base64(book.get("cover"))
+                    if base64_image:
+                        chain.append(Image.fromBase64(base64_image))
+                    else:
+                        chain.append(Plain("\n"))
                 else:
                     chain.append(Plain("\n"))
                 chain.append(Plain(f"作者: {book.get('author', '未知')}\n"))

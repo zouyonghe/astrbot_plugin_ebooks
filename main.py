@@ -16,7 +16,7 @@ from astrbot.api.all import *
 from astrbot.api.event.filter import *
 
 
-@register("ebooks", "buding", "一个功能强大的电子书搜索和下载插件", "1.0.1", "https://github.com/zouyonghe/astrbot_plugin_ebooks")
+@register("ebooks", "buding", "一个功能强大的电子书搜索和下载插件", "1.0.2", "https://github.com/zouyonghe/astrbot_plugin_ebooks")
 class ebooks(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
         super().__init__(context)
@@ -26,7 +26,6 @@ class ebooks(Star):
         os.makedirs(self.TEMP_PATH, exist_ok=True)
 
         self.zlibrary = Zlibrary(email=config["zlib_email"], password=config["zlib_password"])
-
 
     async def is_url_accessible(self, url: str) -> bool:
         """

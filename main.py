@@ -909,7 +909,10 @@ class ebooks(Star):
                     chain.append(Plain("\n"))
                 chain.append(Plain(f"作者: {book.get('author', '未知')}\n"))
                 chain.append(Plain(f"年份: {book.get('year', '未知')}\n"))
-                chain.append(Plain(f"出版社: {book.get('publisher', '未知')}\n"))
+                publisher = book.get("publisher", None)
+                if not publisher or publisher is "None":
+                    publisher = "未知"
+                chain.append(Plain(f"出版社: {publisher}\n"))
                 chain.append(Plain(f"语言: {book.get('language', '未知')}\n"))
                 description = book.get("description", "无简介")
                 if isinstance(description, str) and description != "":
@@ -931,8 +934,8 @@ class ebooks(Star):
             yield event.chain_result([ns])
 
         except Exception as e:
-            logger.error(f"[Zlibrary] Error during book search: {e}")
-            yield event.plain_result("[Zlibrary] 搜索电子书时发生错误，请稍后再试。")
+            logger.error(f"[Z-Library] Error during book search: {e}")
+            yield event.plain_result("[Z-Library] 搜索电子书时发生错误，请稍后再试。")
 
     @zlib.command("download")
     async def download_zlib(self, event: AstrMessageEvent, book_id: str = None, book_hash: str = None):
@@ -948,7 +951,7 @@ class ebooks(Star):
             # 获取电子书详情，确保 ID 合法
             book_details = self.zlibrary.getBookInfo(book_id, hashid=book_hash)
             if not book_details:
-                yield event.plain_result("[Zlibrary] 无法获取电子书详情，请检查电子书 ID 是否正确。")
+                yield event.plain_result("[Z-Library] 无法获取电子书详情，请检查电子书 ID 是否正确。")
                 return
 
             # 下载电子书
@@ -963,18 +966,18 @@ class ebooks(Star):
                     file.write(book_content)
 
                 # 打印日志确认保存成功
-                logger.debug(f"[Zlibrary] 文件已下载并保存到临时目录：{temp_file_path}")
+                logger.debug(f"[Z-Library] 文件已下载并保存到临时目录：{temp_file_path}")
 
                 # 提醒用户下载完成
                 file = File(name=book_name, file=str(temp_file_path))
                 yield event.chain_result([file])
                 os.remove(temp_file_path)
             else:
-                yield event.plain_result("[Zlibrary] 下载电子书时发生错误，请稍后再试。")
+                yield event.plain_result("[Z-Library] 下载电子书时发生错误，请稍后再试。")
 
         except Exception as e:
-            logger.error(f"[Zlibrary] Error during book download: {e}")
-            yield event.plain_result("[Zlibrary] 下载电子书时发生错误，请稍后再试。")
+            logger.error(f"[Z-Library] Error during book download: {e}")
+            yield event.plain_result("[Z-Library] 下载电子书时发生错误，请稍后再试。")
 
     # @llm_tool("search_zlib_books")
     async def search_zlib_books(self, event: AstrMessageEvent, query: str):

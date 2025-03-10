@@ -36,12 +36,7 @@ class Zlibrary:
         self.__cookies = {
             "siteLanguageV2": "en",
         }
-        proxy = os.environ.get("https_proxy")
-        if proxy:
-            self.proxies = {
-                "http": proxy,
-                "https": proxy,
-            }
+        self.proxies = {"http": proxy, "https": proxy} if (proxy := os.environ.get("https_proxy")) else None
 
         if email is not None and password is not None:
             self.login(email, password)

@@ -1,10 +1,12 @@
 import asyncio
+import io
 import random
 import re
 import xml.etree.ElementTree as ET
 from datetime import datetime
 from typing import Optional
 from urllib.parse import quote_plus, urljoin, unquote, urlparse
+from PIL import Image as Img
 
 import aiofiles
 import aiohttp
@@ -36,7 +38,7 @@ class ebooks(Star):
         """
         try:
             async with aiohttp.ClientSession() as session:
-                async with session.head(url, timeout=3, proxy=self.proxy) as response:
+                async with session.head(url, timeout=3, proxy=self.proxy, allow_redirects=True) as response:
                     return response.status == 200  # 返回状态是否为 200
         except:
             return False  # 如果请求失败（超时、连接中断等）则返回 False
@@ -45,22 +47,53 @@ class ebooks(Star):
         try:
             async with aiohttp.ClientSession() as session:
                 async with session.get(cover_url, proxy=self.proxy) as response:
-                    if response.status == 200:
-                        # 读取响应内容
-                        content = await response.read()
-                        # 将图片内容转换为 Base64
-                        base64_data = base64.b64encode(content).decode("utf-8")
-                        return base64_data
-                    else:
+                    if response.status != 200:
                         return None
+
+                    content_type = response.headers.get('Content-Type', '').lower()
+                    # 如果 Content-Type 包含 html，则说明可能不是直接的图片
+                    if 'html' in content_type:
+                        html_content = await response.text()
+                        # 使用 BeautifulSoup 提取图片地址
+                        soup = BeautifulSoup(html_content, 'html.parser')
+                        img_tag = soup.find('meta', attrs={'property': 'og:image'})
+                        if img_tag:
+                            cover_url = img_tag.get('content')
+                            # 再次尝试下载真正的图片地址
+                            return await self.download_and_convert_to_base64(cover_url)
+                        else:
+                            return None
+
+                    # 如果是图片内容，继续下载并转为 Base64
+                    content = await response.read()
+                    base64_data = base64.b64encode(content).decode("utf-8")
+                    return base64_data
         except (ClientPayloadError, aiohttp.ContentLengthError) as payload_error:
             logger.warning(f"Ignored ContentLengthError: {payload_error}")
             # 尝试已接收的数据部分
             if 'content' in locals():  # 如果部分内容已下载
                 base64_data = base64.b64encode(content).decode("utf-8")
-                return base64_data
+                if self.is_base64_image(base64_data):  # 检查 Base64 数据是否有效
+                    return base64_data
         except Exception as e:
             return None
+
+    def is_base64_image(self, base64_data: str) -> bool:
+        """
+        检测 Base64 数据是否为有效图片
+        :param base64_data: Base64 编码的字符串
+        :return: 如果是图片返回 True，否则返回 False
+        """
+        try:
+            # 解码 Base64 数据
+            image_data = base64.b64decode(base64_data)
+            # 尝试用 Pillow 打开图片
+            image = Img.open(io.BytesIO(image_data))
+            # 如果图片能正确被打开，再检查格式是否为支持的图片格式
+            image.verify()  # 验证图片
+            return True  # Base64 是有效图片
+        except Exception:
+            return False  # 如果解析失败，说明不是图片
 
     async def _search_calibre_web(self, query: str, limit: int = None):
         '''Call the Calibre-Web Catalog API to search for eBooks.'''
@@ -225,7 +258,7 @@ class ebooks(Star):
             if guidance:
                 ns.nodes.append(Node(uin=event.get_self_id(), name="Calibre-Web", content=guidance))
 
-            for idx, item in enumerate(results):
+            for item in results:
                 chain = await self.build_book_chain(item)
                 node = Node(
                     uin=event.get_self_id(),
@@ -494,7 +527,7 @@ class ebooks(Star):
 
         ns = Nodes([])
 
-        for index, book in enumerate(search_results, start=1):
+        for book in search_results:
             book_id = book.get("id")
             detail = detailed_books.get(book_id, {}).get("book", {})
 
@@ -502,7 +535,7 @@ class ebooks(Star):
                 Plain(f"书名: {book.get('title', '未知')}\n"),
                 Plain(f"作者: {book.get('author', '未知')}\n"),
                 Plain(f"年份: {detail.get('year', '未知')}\n"),
-                Plain(f"出版社: {detail.get('publisher', '未知')}"),
+                Plain(f"出版社: {detail.get('publisher', '未知')}\n"),
                 Plain(f"语言: {detail.get('language', '未知')}\n"),
                 Plain(f"文件大小: {detail.get('filesize', '未知')}\n"),
                 Plain(f"文件类型: {detail.get('extension', '未知')}\n"),
@@ -589,7 +622,7 @@ class ebooks(Star):
             "q": f'title:"{query}" mediatype:texts',  # 根据标题搜索
             "fl[]": "identifier,title",  # 返回 identifier 和 title 字段
             "sort[]": "downloads desc",  # 按下载量排序
-            "rows": limit,  # 最大结果数量
+            "rows": limit+10,  # 最大结果数量
             "page": 1,
             "output": "json"  # 返回格式为 JSON
         }
@@ -627,7 +660,7 @@ class ebooks(Star):
                     "description": metadata.get("description")
                 }
                 for doc, metadata in zip(docs, metadata_results) if metadata
-            ]
+            ][:limit]
             return books
 
     async def _fetch_metadata(self, session: aiohttp.ClientSession, url: str, formats: tuple) -> dict:
@@ -727,7 +760,7 @@ class ebooks(Star):
 
             # 返回结果到用户
             ns = Nodes([])
-            for idx, book in enumerate(results, start=1):
+            for book in results:
                 chain = [Plain(f"{book.get('title', '未知')}")]
                 if book.get("cover") and await self.is_url_accessible(book.get("cover")):
                     base64_image = await self.download_and_convert_to_base64(book.get("cover"))
@@ -872,7 +905,7 @@ class ebooks(Star):
             books = results.get("books", [])
             ns = Nodes([])
 
-            for index, book in enumerate(books, start=1):
+            for book in books:
                 chain = [Plain(f"{book.get('title', '未知')}")]
                 if book.get("cover") and await self.is_url_accessible(book.get("cover")):
                     base64_image = await self.download_and_convert_to_base64(book.get("cover"))

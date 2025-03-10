@@ -2,11 +2,13 @@ import asyncio
 import random
 import re
 import xml.etree.ElementTree as ET
+from datetime import datetime
 from typing import Optional
 from urllib.parse import quote_plus, urljoin, unquote, urlparse
 
 import aiofiles
 import aiohttp
+from aiohttp import ClientPayloadError
 from bs4 import BeautifulSoup
 
 from data.plugins.astrbot_plugin_ebooks.Zlibrary import Zlibrary
@@ -52,8 +54,13 @@ class ebooks(Star):
                         return base64_data
                     else:
                         return None
+        except (ClientPayloadError, aiohttp.ContentLengthError) as payload_error:
+            logger.warning(f"Ignored ContentLengthError: {payload_error}")
+            # 尝试已接收的数据部分
+            if 'content' in locals():  # 如果部分内容已下载
+                base64_data = base64.b64encode(content).decode("utf-8")
+                return base64_data
         except Exception as e:
-            logger.error(f"An error occurred when downloading cover: {e}")
             return None
 
     async def _search_calibre_web(self, query: str, limit: int = None):
@@ -109,11 +116,23 @@ class ebooks(Star):
 
                 # 提取出版日期（<published>）
                 published_element = entry.find("default:published", namespace)
-                published_date = published_element.text if published_element is not None else "未知出版日期"
+                #published_date = published_element.text if published_element is not None else "未知出版日期"
+                if published_element is not None and published_element.text:
+                    try:
+                        # 解析日期字符串为 datetime 对象，并提取年份
+                        year = datetime.fromisoformat(published_element.text).year
+                    except ValueError:
+                        year = "未知年份"  # 日期解析失败时处理
+                else:
+                    year = "未知年份"
 
                 # 提取语言（<dcterms:language>），需注意 namespace
                 lang_element = entry.find("default:dcterms:language", namespace)
                 language = lang_element.text if lang_element is not None else "未知语言"
+
+                # 提取出版社信息（<publisher>）
+                publisher_element = entry.find("default:publisher/default:name", namespace)
+                publisher = publisher_element.text if publisher_element is not None else "未知出版社"
 
                 # 提取图书封面链接（rel="http://opds-spec.org/image"）
                 cover_element = entry.find("default:link[@rel='http://opds-spec.org/image']", namespace)
@@ -151,7 +170,8 @@ class ebooks(Star):
                     "title": title,
                     "authors": authors,
                     "summary": summary,
-                    "published_date": published_date,
+                    "year": year,
+                    "publisher": publisher,
                     "language": language,
                     "cover_link": cover_link,
                     "thumbnail_link": thumbnail_link,
@@ -177,9 +197,17 @@ class ebooks(Star):
             chain.append(Image.fromURL(item["cover_link"]))
         else:
             chain.append(Plain("\n"))
-        chain.append(Plain(f"作者: {item.get('authors', '未知作者')}"))
-        chain.append(Plain(f"\n简介: {item.get('summary', '暂无简介')}"))
-        chain.append(Plain(f"\n链接(用于下载): {item.get('download_link', '未知链接')}"))
+        chain.append(Plain(f"作者: {item.get('authors', '未知')}\n"))
+        chain.append(Plain(f"年份: {item.get('year', '未知')}\n"))
+        chain.append(Plain(f"出版社: {item.get('publisher', '未知')}\n"))
+        description = item.get("summary", "")
+        if isinstance(description, str) and description != "":
+            description = description.strip()
+            description = description[:150] + "..." if len(description) > 150 else description
+        else:
+            description = "无简介"
+        chain.append(Plain(f"简介: {description}\n"))
+        chain.append(Plain(f"链接(用于下载): {item.get('download_link', '未知')}"))
         return chain
 
     async def _show_calibre_result(self, event: AstrMessageEvent, results: list, guidance: str = None):
@@ -208,29 +236,6 @@ class ebooks(Star):
                 ns.nodes.append(node)
 
             yield event.chain_result([ns])
-
-    def to_string(self, results: list) -> str:
-        """
-        将结果列表中的所有项目拼接为字符串。
-
-        Args:
-            results (list): 包含字典的结果列表，其中每个字典表示一个条目。
-
-        Returns:
-            str: 拼接后的总字符串表示结果。
-        """
-        if not results:
-            return "没有找到结果。"
-
-        result_strings = []
-        for item in results:
-            part = f"标题: {item.get('title', '未知标题')}\n"
-            part += f"作者: {item.get('authors', '未知作者')}\n"
-            part += f"描述: {item.get('summary', '暂无描述')}\n"
-            part += f"链接: {item.get('download_link', '无下载链接')}\n"
-            result_strings.append(part)
-
-        return "\n\n".join(result_strings)
 
     @command_group("calibre")
     def calibre(self):
@@ -495,12 +500,13 @@ class ebooks(Star):
             detail = detailed_books.get(book_id, {}).get("book", {})
 
             chain = [
-                Plain(f"标题: {book.get('title', '未知')}\n"),
+                Plain(f"书名: {book.get('title', '未知')}\n"),
                 Plain(f"作者: {book.get('author', '未知')}\n"),
+                Plain(f"年份: {detail.get('year', '未知')}\n"),
+                Plain(f"出版社: {detail.get('publisher', '未知')}"),
                 Plain(f"语言: {detail.get('language', '未知')}\n"),
                 Plain(f"文件大小: {detail.get('filesize', '未知')}\n"),
                 Plain(f"文件类型: {detail.get('extension', '未知')}\n"),
-                Plain(f"年份: {detail.get('year', '未知')}\n"),
                 Plain(f"ID(用于下载): {book_id}"),
             ]
 
@@ -613,9 +619,11 @@ class ebooks(Star):
             books = [
                 {
                     "title": doc.get("title"),
-                    "authors": metadata.get("authors"),
                     "cover": metadata.get("cover"),
+                    "authors": metadata.get("authors"),
                     "language": metadata.get("language"),
+                    "year": metadata.get("year"),
+                    "publisher": metadata.get("publisher"),
                     "download_url": metadata.get("download_url"),
                     "description": metadata.get("description")
                 }
@@ -648,6 +656,9 @@ class ebooks(Star):
             description = book_detail.get("metadata", {}).get("description", "无简介")
             authors = book_detail.get("metadata", {}).get("creator", "未知")
             language = book_detail.get("metadata", {}).get("language", "未知")
+            year = book_detail.get("metadata", {}).get("publicdate", "未知")[:4] if book_detail.get("metadata", {}).get(
+                "publicdate", "未知") != "未知" else "未知"
+            publisher = book_detail.get("metadata", {}).get("publisher", "未知")
 
             # 判断并解析简介
             if isinstance(description, str):
@@ -664,10 +675,12 @@ class ebooks(Star):
                 if any(file.get("name", "").lower().endswith(fmt) for fmt in formats):
                     return {
                         "cover": f"https://archive.org/services/img/{identifier}",
-                        "download_url": f"https://archive.org/download/{identifier}/{file['name']}",
-                        "description": description,
                         "authors": authors,
+                        "year": year,
+                        "publisher": publisher,
                         "language": language,
+                        "description": description,
+                        "download_url": f"https://archive.org/download/{identifier}/{file['name']}",
                     }
 
         except Exception as e:
@@ -726,6 +739,8 @@ class ebooks(Star):
                 else:
                     chain.append(Plain("\n"))
                 chain.append(Plain(f"作者: {book.get('authors', '未知')}\n"))
+                chain.append(Plain(f"年份: {book.get('year', '未知')}\n"))
+                chain.append(Plain(f"出版社: {book.get('publisher', '未知')}\n"))
                 chain.append(Plain(f"语言: {book.get('language', '未知')}\n"))
                 chain.append(Plain(f"简介: {book.get('description', '无简介')}\n"))
                 chain.append(Plain(f"链接(用于下载): {book.get('download_url', '未知')}"))

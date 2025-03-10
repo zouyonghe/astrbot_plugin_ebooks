@@ -35,7 +35,7 @@ class ebooks(Star):
         """
         try:
             async with aiohttp.ClientSession() as session:
-                async with session.head(url, timeout=3) as response:
+                async with session.head(url, timeout=10) as response:
                     return response.status == 200  # 返回状态是否为 200
         except:
             return False  # 如果请求失败（超时、连接中断等）则返回 False

@@ -643,10 +643,12 @@ class ebooks(Star):
             book_detail = await response.json()
 
             identifier = book_detail.get("metadata", {}).get("identifier", None)
+            if not identifier:
+                return {}
             files = book_detail.get("files", [])
-            description = book_detail.get("metadata", {}).get("description", None)
-            authors = book_detail.get("metadata", {}).get("creator", None)
-            language = book_detail.get("metadata", {}).get("language", None)
+            description = book_detail.get("metadata", {}).get("description", "无简介")
+            authors = book_detail.get("metadata", {}).get("creator", "未知")
+            language = book_detail.get("metadata", {}).get("language", "未知")
 
             # 判断并解析简介
             if isinstance(description, str):

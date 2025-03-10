@@ -38,7 +38,6 @@ class ebooks(Star):
                 async with session.head(url, timeout=3, proxy=self.proxy) as response:
                     return response.status == 200  # 返回状态是否为 200
         except:
-            logger.error(f"Failed to check URL accessibility: {url}")
             return False  # 如果请求失败（超时、连接中断等）则返回 False
 
     async def download_and_convert_to_base64(self, cover_url):
@@ -52,10 +51,9 @@ class ebooks(Star):
                         base64_data = base64.b64encode(content).decode("utf-8")
                         return base64_data
                     else:
-                        logger.error(f"Failed to download the cover. HTTP Status: {response.status}")
                         return None
         except Exception as e:
-            logger.error(f"An error occurred: {e}")
+            logger.error(f"An error occurred when downloading cover: {e}")
             return None
 
     async def _search_calibre_web(self, query: str, limit: int = None):

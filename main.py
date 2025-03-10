@@ -26,7 +26,7 @@ class ebooks(Star):
         os.makedirs(self.TEMP_PATH, exist_ok=True)
 
         self.zlibrary = Zlibrary(email=config["zlib_email"], password=config["zlib_password"])
-        self.zlibrary.login(email=config["zlib_email"], password=config["zlib_password"])
+
 
     async def is_url_accessible(self, url: str) -> bool:
         """
@@ -859,6 +859,9 @@ class ebooks(Star):
 
             logger.info(f"[Z-Library] Received books search query: {query}, limit: {limit}")
 
+            # 登录 Zlibrary
+            self.zlibrary.login(email=self.config["zlib_email"], password=self.config["zlib_password"])
+
             # 调用 Zlibrary 的 search 方法进行搜索
             results = self.zlibrary.search(message=query, limit=limit)
 
@@ -915,6 +918,9 @@ class ebooks(Star):
             return
 
         try:
+            # 登录 Zlibrary
+            self.zlibrary.login(email=self.config["zlib_email"], password=self.config["zlib_password"])
+
             # 获取电子书详情，确保 ID 合法
             book_details = self.zlibrary.getBookInfo(book_id, hashid=book_hash)
             if not book_details:

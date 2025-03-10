@@ -1134,34 +1134,34 @@ class ebooks(Star):
             # 捕获并处理运行时错误
             yield event.plain_result(f"[ebooks] 下载电子书时发生错误，请稍后再试。")
 
-        @llm_tool("search_ebooks")
-        async def search_ebooks(self, event: AstrMessageEvent, query: str):
-            """Search for eBooks across all supported platforms.
+    @llm_tool("search_ebooks")
+    async def search_ebooks(self, event: AstrMessageEvent, query: str):
+        """Search for eBooks across all supported platforms.
 
-            When to use:
-                This method performs a unified search across multiple platforms supported by this plugin,
-                allowing users to find ebooks by title or keyword.
-                Unless a specific platform is explicitly mentioned, this function should be used as the default means for searching books.
+        When to use:
+            This method performs a unified search across multiple platforms supported by this plugin,
+            allowing users to find ebooks by title or keyword.
+            Unless a specific platform is explicitly mentioned, this function should be used as the default means for searching books.
 
 
-            Args:
-                query (string): The keyword or book title for searching.
-            """
-            async for result in self.search_all_platforms(event, query, limit="20"):
-                yield result
+        Args:
+            query (string): The keyword or book title for searching.
+        """
+        async for result in self.search_all_platforms(event, query, limit="20"):
+            yield result
 
-        @llm_tool("download_ebooks")
-        async def download_ebooks(self, event: AstrMessageEvent, arg1: str, arg2: str = None):
-            """Download eBooks by dispatching to the appropriate platform's download method.
+    @llm_tool("download_ebook")
+    async def download_ebook(self, event: AstrMessageEvent, arg1: str, arg2: str = None):
+        """Download eBooks by dispatching to the appropriate platform's download method.
 
-            When to use:
-                This method facilitates downloading of ebooks by automatically identifying the platform
-                from the provided identifier (ID, URL, or Hash), and then calling the corresponding platform's download function.
-                Unless the platform is specifically mentioned, this function serves as the default for downloading ebooks.
+        When to use:
+            This method facilitates downloading of ebooks by automatically identifying the platform
+            from the provided identifier (ID, URL, or Hash), and then calling the corresponding platform's download function.
+            Unless the platform is specifically mentioned, this function serves as the default for downloading ebooks.
 
-            Args:
-                arg1 (string): Primary identifier, such as a URL or book ID.
-                arg2 (string): Secondary input, such as a hash, required for Z-Library downloads.
-            """
-            async for result in self.download_all_platforms(event, arg1, arg2):
-                yield result
+        Args:
+            arg1 (string): Primary identifier, such as a URL or book ID.
+            arg2 (string): Secondary input, such as a hash, required for Z-Library downloads.
+        """
+        async for result in self.download_all_platforms(event, arg1, arg2):
+            yield result

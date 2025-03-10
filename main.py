@@ -336,7 +336,7 @@ class ebooks(Star):
             logger.error(f"[Calibre-Web] 推荐电子书时发生错误: {e}")
             yield event.plain_result("[Calibre-Web] 推荐电子书时发生错误，请稍后再试。")
 
-    @llm_tool("search_calibre_books")
+    # @llm_tool("search_calibre_books")
     async def search_calibre_books(self, event: AstrMessageEvent, query: str):
         """Search books by keywords or title through Calibre-Web.
         When to use:
@@ -349,7 +349,7 @@ class ebooks(Star):
         async for result in self.search_calibre(event, query):
             yield result
 
-    @llm_tool("download_calibre_book")
+    # @llm_tool("download_calibre_book")
     async def download_calibre_book(self, event: AstrMessageEvent, book_identifier: str):
         """Download a book by a precise name or URL through Calibre-Web.
         When to use:
@@ -548,7 +548,7 @@ class ebooks(Star):
         file = File(name=f"{book_name}.{extension}", file=ebook_url)
         yield event.chain_result([file])
 
-    @llm_tool("search_liber3_books")
+    # @llm_tool("search_liber3_books")
     async def search_liber3_books(self, event: AstrMessageEvent, query: str):
         """Search for books using Liber3 API and return a detailed result list.
 
@@ -561,7 +561,7 @@ class ebooks(Star):
         async for result in self.search_liber3(event, query):
             yield result
 
-    @llm_tool("download_liber3_book")
+    # @llm_tool("download_liber3_book")
     async def download_liber3_book(self, event: AstrMessageEvent, book_id: str):
         """Download a book using Liber3's API via its unique ID.
 
@@ -814,7 +814,7 @@ class ebooks(Star):
             logger.error(f"[Archive] 下载失败: {e}")
             yield event.plain_result(f"[Archive] 下载电子书时发生错误，请稍后再试。")
 
-    @llm_tool("search_archive_books")
+    # @llm_tool("search_archive_books")
     async def search_archive_books(self, event: AstrMessageEvent, query: str):
         """Search for eBooks using the Archive API.
     
@@ -827,7 +827,7 @@ class ebooks(Star):
         async for result in self.search_archive(event, query):
             yield result
 
-    @llm_tool("download_archive_book")
+    # @llm_tool("download_archive_book")
     async def download_archive_book(self, event: AstrMessageEvent, download_url: str):
         """Download an eBook from the Archive API using its download URL.
     
@@ -952,7 +952,7 @@ class ebooks(Star):
             logger.error(f"[Zlibrary] Error during book download: {e}")
             yield event.plain_result("[Zlibrary] 下载电子书时发生错误，请稍后再试。")
 
-    @llm_tool("search_zlib_books")
+    # @llm_tool("search_zlib_books")
     async def search_zlib_books(self, event: AstrMessageEvent, query: str):
         """Search Zlibrary for books using given keywords.
 
@@ -965,7 +965,7 @@ class ebooks(Star):
         async for result in self.search_zlib(event, query):
             yield result
 
-    @llm_tool("download_zlib_book")
+    # @llm_tool("download_zlib_book")
     async def download_zlib_book(self, event: AstrMessageEvent, book_id: str, book_hash: str):
         """Download a book from Z-Library using its book ID and hash.
     

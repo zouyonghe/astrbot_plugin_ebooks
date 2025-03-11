@@ -625,6 +625,7 @@ class ebooks(Star):
         async for result in self.download_liber3(event, book_id):
             yield result
 
+
     async def _search_archive_books(self, query: str, limit: int = 20):
         """Search for eBooks through the Archive API and filter files in PDF or EPUB formats.
             Args:
@@ -777,6 +778,10 @@ class ebooks(Star):
             yield event.plain_result("[Archive] 功能未启用。")
             return
 
+        if not self.is_url_accessible("https://archive.org/advancedsearch.php"):
+            yield event.plain_result("[Archive] 无法连接到 Archive.org。")
+            return
+
         if not query:
             yield event.plain_result("[Archive] 请提供电子书关键词以进行搜索。")
             return
@@ -787,7 +792,7 @@ class ebooks(Star):
             return
         try:
             logger.info(f"[Archive] Received books search query: {query}, limit: {limit}")
-            results = await self._search_archive_books(query, limit)
+            results = await self._search_archive_books(limit)
 
             if not results:
                 yield event.plain_result("[Archive] 未找到匹配的电子书。")
@@ -829,6 +834,10 @@ class ebooks(Star):
         """
         if not self.config.get("enable_archive", False):
             yield event.plain_result("[Archive] 功能未启用。")
+            return
+
+        if not self.is_url_accessible("https://archive.org/advancedsearch.php"):
+            yield event.plain_result("[Archive] 无法连接到 Archive.org。")
             return
 
         if not self.is_valid_archive_book_url(book_url):
@@ -935,6 +944,10 @@ class ebooks(Star):
             yield event.plain_result("[Z-Library] 功能未启用。")
             return
 
+        if not self.is_url_accessible("https://z-library.sk"):
+            yield event.plain_result("[Z-Library] 无法连接到 Z-Library。")
+            return
+
         if not query:
             yield event.plain_result("[Z-Library] 请提供电子书关键词以进行搜索。")
             return
@@ -1008,8 +1021,12 @@ class ebooks(Star):
             yield event.plain_result("[Z-Library] 功能未启用。")
             return
 
+        if not self.is_url_accessible("https://z-library.sk"):
+            yield event.plain_result("[Z-Library] 无法连接到 Z-Library。")
+            return
+
         if not self.is_valid_zlib_book_id(book_id) or not self.is_valid_zlib_book_hash(book_hash):
-            yield event.plain_result("请使用 /zlib download <id> <hash> 下载。")
+            yield event.plain_result("[Z-Library] 请使用 /zlib download <id> <hash> 下载。")
             return
 
         try:

@@ -9,7 +9,6 @@ https://github.com/bipinkrish/Zlibrary-API/
 import os
 
 import requests
-from aiohttp.helpers import proxies_from_env
 
 
 class Zlibrary:

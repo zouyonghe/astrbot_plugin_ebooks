@@ -9,6 +9,7 @@ https://github.com/bipinkrish/Zlibrary-API/
 import os
 
 import requests
+from aiohttp.helpers import proxies_from_env
 
 
 class Zlibrary:
@@ -94,13 +95,17 @@ class Zlibrary:
         if not self.isLoggedIn() and override is False:
             print("Not logged in")
             return
+        payload = {
+            "data": data,
+            "cookies": self.__cookies,
+            "headers": self.__headers,
+        }
+        if self.__proxies:
+            payload["proxies"] = self.__proxies
 
         return requests.post(
             "https://" + self.__domain + url,
-            data=data,
-            cookies=self.__cookies,
-            headers=self.__headers,
-            proxies=self.__proxies,
+            **payload
         ).json()
 
     def __makeGetRequest(
@@ -110,12 +115,17 @@ class Zlibrary:
             print("Not logged in")
             return
 
+        payload = {
+            "params": params,
+            "cookies": self.__cookies if cookies is None else cookies,
+            "headers": self.__headers,
+        }
+        if self.__proxies:
+            payload["proxies"] = self.__proxies
+
         return requests.get(
             "https://" + self.__domain + url,
-            params=params,
-            cookies=self.__cookies if cookies is None else cookies,
-            headers=self.__headers,
-            proxies=self.__proxies,
+            **payload
         ).json()
 
     def getProfile(self) -> dict[str, str]:

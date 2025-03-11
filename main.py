@@ -26,6 +26,7 @@ class ebooks(Star):
         self.proxy = os.environ.get("https_proxy")
         self.TEMP_PATH = os.path.abspath("data/temp")
         os.makedirs(self.TEMP_PATH, exist_ok=True)
+        self.zlibrary = None
 
     async def is_url_accessible(self, url: str) -> bool:
         """
@@ -941,10 +942,11 @@ class ebooks(Star):
 
             logger.info(f"[Z-Library] Received books search query: {query}, limit: {limit}")
 
-            zlibrary = Zlibrary(email=self.config["zlib_email"], password=self.config["zlib_password"])
+            if not self.zlibrary:
+                self.zlibrary = Zlibrary(email=self.config["zlib_email"], password=self.config["zlib_password"])
 
             # 调用 Zlibrary 的 search 方法进行搜索
-            results = zlibrary.search(message=query, limit=limit)
+            results = self.zlibrary.search(message=query, limit=limit)
 
             if not results or not results.get("books"):
                 yield event.plain_result("[Z-Library] 未找到匹配的电子书。")
@@ -1006,16 +1008,17 @@ class ebooks(Star):
             return
 
         try:
-            zlibrary = Zlibrary(email=self.config["zlib_email"], password=self.config["zlib_password"])
+            if not self.zlibrary:
+                self.zlibrary = Zlibrary(email=self.config["zlib_email"], password=self.config["zlib_password"])
 
             # 获取电子书详情，确保 ID 合法
-            book_details = zlibrary.getBookInfo(book_id, hashid=book_hash)
+            book_details = self.zlibrary.getBookInfo(book_id, hashid=book_hash)
             if not book_details:
                 yield event.plain_result("[Z-Library] 无法获取电子书详情，请检查电子书 ID 是否正确。")
                 return
 
             # 下载电子书
-            downloaded_book = zlibrary.downloadBook({"id": book_id, "hash": book_hash})
+            downloaded_book = self.zlibrary.downloadBook({"id": book_id, "hash": book_hash})
             if downloaded_book:
                 book_name, book_content = downloaded_book
                 # 构造临时文件路径

@@ -28,16 +28,21 @@ class ebooks(Star):
         os.makedirs(self.TEMP_PATH, exist_ok=True)
         self.zlibrary = None
 
-    async def is_url_accessible(self, url: str) -> bool:
+    async def is_url_accessible(self, url: str, prxoy: bool=True) -> bool:
         """
         异步检查给定的 URL 是否可访问。
 
         :param url: 要检查的 URL
         :return: 如果 URL 可访问返回 True，否则返回 False
+        :proxy: 是否使用代理
         """
         try:
             async with aiohttp.ClientSession() as session:
-                async with session.head(url, timeout=3, proxy=self.proxy, allow_redirects=True) as response:
+                if prxoy:
+                    async with session.head(url, timeout=3, allow_redirects=True) as response:
+                        return response.status == 200  # 返回状态是否为 200
+                else:
+                    async with session.head(url, timeout=3, proxy=self.proxy, allow_redirects=True) as response:
                     return response.status == 200  # 返回状态是否为 200
         except:
             return False  # 如果请求失败（超时、连接中断等）则返回 False
@@ -223,7 +228,7 @@ class ebooks(Star):
         :return: 生成的消息链列表
         """
         chain = [Plain(f"{item['title']}")]
-        if item.get("cover_link") and await self.is_url_accessible(item.get("cover_link")):
+        if item.get("cover_link") and await self.is_url_accessible(item.get("cover_link"), False):
             chain.append(Image.fromURL(item["cover_link"]))
         else:
             chain.append(Plain("\n"))
@@ -321,7 +326,7 @@ class ebooks(Star):
 
         try:
             async with aiohttp.ClientSession() as session:
-                async with session.get(book_url) as response:
+                async with session.get(book_url, timeout=3) as response:
                     if response.status == 200:
                         # 从 Content-Disposition 提取文件名
                         content_disposition = response.headers.get("Content-Disposition")
@@ -433,7 +438,7 @@ class ebooks(Star):
 
         try:
             async with aiohttp.ClientSession() as session:
-                async with session.post(detail_url, headers=headers, json=payload, proxy=self.proxy) as response:
+                async with session.post(detail_url, headers=headers, json=payload, proxy=self.proxy, timeout=3) as response:
                     if response.status == 200:
                         data = await response.json()
                         return data.get("data", {}).get("book", {})
@@ -458,7 +463,7 @@ class ebooks(Star):
 
         try:
             async with aiohttp.ClientSession() as session:
-                async with session.post(search_url, headers=headers, json=payload, proxy=self.proxy) as response:
+                async with session.post(search_url, headers=headers, json=payload, proxy=self.proxy, timeout=3) as response:
                     if response.status == 200:
                         data = await response.json()
 
@@ -643,7 +648,7 @@ class ebooks(Star):
 
         async with aiohttp.ClientSession() as session:
             # 1. 调用 Archive 搜索 API
-            response = await session.get(base_search_url, params=params, proxy=self.proxy)
+            response = await session.get(base_search_url, params=params, proxy=self.proxy, timeout=3)
             if response.status != 200:
                 logger.error(
                     f"[Archive] Error during search: Archive API returned status code {response.status}")
@@ -688,7 +693,7 @@ class ebooks(Star):
                 dict: A dictionary with download links, file type, cover, and description
         """
         try:
-            response = await session.get(url, proxy=self.proxy)
+            response = await session.get(url, proxy=self.proxy, timeout=3)
             if response.status != 200:
                 logger.error(f"[Archive] Error retrieving Metadata: Status code {response.status}")
                 return {}
@@ -833,7 +838,7 @@ class ebooks(Star):
         try:
             async with aiohttp.ClientSession() as session:
                 # 发出 GET 请求并跟随跳转
-                async with session.get(book_url, allow_redirects=True, proxy=self.proxy) as response:
+                async with session.get(book_url, allow_redirects=True, proxy=self.proxy, timeout=3) as response:
                     if response.status == 200:
                         ebook_url = str(response.url)
                         logger.debug(f"[Archive] 跳转后的下载地址: {ebook_url}")

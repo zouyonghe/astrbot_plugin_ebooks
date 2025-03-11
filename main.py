@@ -778,8 +778,10 @@ class ebooks(Star):
             yield event.plain_result("[Archive] 功能未启用。")
             return
 
-        if not self.is_url_accessible("https://archive.org/advancedsearch.php"):
+        if not self.is_url_accessible("https://archive.org"):
             yield event.plain_result("[Archive] 无法连接到 Archive.org。")
+            self.config["enable_archive"] = False
+            self.config.save_config()
             return
 
         if not query:
@@ -792,7 +794,7 @@ class ebooks(Star):
             return
         try:
             logger.info(f"[Archive] Received books search query: {query}, limit: {limit}")
-            results = await self._search_archive_books(limit)
+            results = await self._search_archive_books(query, limit)
 
             if not results:
                 yield event.plain_result("[Archive] 未找到匹配的电子书。")
@@ -838,6 +840,8 @@ class ebooks(Star):
 
         if not self.is_url_accessible("https://archive.org/advancedsearch.php"):
             yield event.plain_result("[Archive] 无法连接到 Archive.org。")
+            self.config["enable_archive"] = False
+            self.config.save_config()
             return
 
         if not self.is_valid_archive_book_url(book_url):
@@ -946,6 +950,8 @@ class ebooks(Star):
 
         if not await self.is_url_accessible("https://z-library.sk"):
             yield event.plain_result("[Z-Library] 无法连接到 Z-Library。")
+            self.config["enable_zlib"] = False
+            self.config.save_config()
             return
 
         if not query:
@@ -1023,6 +1029,8 @@ class ebooks(Star):
 
         if not await self.is_url_accessible("https://z-library.sk"):
             yield event.plain_result("[Z-Library] 无法连接到 Z-Library。")
+            self.config["enable_zlib"] = False
+            self.config.save_config()
             return
 
         if not self.is_valid_zlib_book_id(book_id) or not self.is_valid_zlib_book_hash(book_hash):

@@ -778,8 +778,7 @@ class ebooks(Star):
             yield event.plain_result("[Archive] 功能未启用。")
             return
 
-        yield event.plain_result(f"Archive 连接性: {self.is_url_accessible('https://archive.org')}")
-        if not self.is_url_accessible("https://archive.org"):
+        if not await self.is_url_accessible("https://archive.org"):
             yield event.plain_result("[Archive] 无法连接到 Archive.org，已禁用。")
             self.config["enable_archive"] = False
             self.config.save_config()
@@ -839,7 +838,7 @@ class ebooks(Star):
             yield event.plain_result("[Archive] 功能未启用。")
             return
 
-        if not self.is_url_accessible("https://archive.org"):
+        if not await self.is_url_accessible("https://archive.org"):
             yield event.plain_result("[Archive] 无法连接到 Archive.org，已禁用。")
             self.config["enable_archive"] = False
             self.config.save_config()

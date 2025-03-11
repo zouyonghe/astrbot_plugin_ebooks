@@ -1139,21 +1139,15 @@ class ebooks(Star):
             """将异步生成器转化为标准协程并返回结果，以确保类型正确"""
             return [item async for item in gen]
 
-        # 将搜索方法转换成可消费的任务
-        calibre_task = consume_generator_async(self.search_calibre(event, query, limit))
-        liber3_task = consume_generator_async(self.search_liber3(event, query, limit))
-        zlibrary_task = consume_generator_async(self.search_zlib(event, query, limit))
-        archive_task = consume_generator_async(self.search_archive(event, query, limit))
-
         tasks = []
         if self.config.get("enable_calibre", False):
-            tasks.append(calibre_task)
+            tasks.append(consume_generator_async(self.search_calibre(event, query, limit)))
         if self.config.get("enable_liber3", False):
-            tasks.append(liber3_task)
+            tasks.append(consume_generator_async(self.search_liber3(event, query, limit)))
         if self.config.get("enable_archive", False):
-            tasks.append(archive_task)
+            tasks.append(consume_generator_async(self.search_archive(event, query, limit)))
         if self.config.get("enable_zlib", False):
-            tasks.append(zlibrary_task)
+            tasks.append(consume_generator_async(self.search_zlib(event, query, limit)))
 
         try:
             # 并发运行所有任务

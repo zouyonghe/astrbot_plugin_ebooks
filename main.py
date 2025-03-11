@@ -28,17 +28,17 @@ class ebooks(Star):
         os.makedirs(self.TEMP_PATH, exist_ok=True)
         self.zlibrary = None
 
-    async def is_url_accessible(self, url: str, prxoy: bool=True) -> bool:
+    async def is_url_accessible(self, url: str, proxy: bool=True) -> bool:
         """
         异步检查给定的 URL 是否可访问。
 
         :param url: 要检查的 URL
+        :param proxy: 是否使用代理
         :return: 如果 URL 可访问返回 True，否则返回 False
-        :proxy: 是否使用代理
         """
         try:
             async with aiohttp.ClientSession() as session:
-                if prxoy:
+                if proxy:
                     async with session.head(url, timeout=10, proxy=self.proxy, allow_redirects=True) as response:
                         return response.status == 200
                 else:
@@ -944,7 +944,7 @@ class ebooks(Star):
             yield event.plain_result("[Z-Library] 功能未启用。")
             return
 
-        if not self.is_url_accessible("https://z-library.sk"):
+        if not await self.is_url_accessible("https://z-library.sk"):
             yield event.plain_result("[Z-Library] 无法连接到 Z-Library。")
             return
 
@@ -1021,7 +1021,7 @@ class ebooks(Star):
             yield event.plain_result("[Z-Library] 功能未启用。")
             return
 
-        if not self.is_url_accessible("https://z-library.sk"):
+        if not await self.is_url_accessible("https://z-library.sk"):
             yield event.plain_result("[Z-Library] 无法连接到 Z-Library。")
             return
 

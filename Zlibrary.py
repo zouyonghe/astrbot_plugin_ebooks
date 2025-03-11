@@ -36,7 +36,7 @@ class Zlibrary:
         self.__cookies = {
             "siteLanguageV2": "en",
         }
-        self.proxies = {"http": proxy, "https": proxy} if (proxy := os.environ.get("https_proxy")) else None
+        self.__proxies = {"http": proxy, "https": proxy} if (proxy := os.environ.get("https_proxy")) else None
 
         if email is not None and password is not None:
             self.login(email, password)
@@ -100,7 +100,7 @@ class Zlibrary:
             data=data,
             cookies=self.__cookies,
             headers=self.__headers,
-            proxies=self.proxies,
+            proxies=self.__proxies,
         ).json()
 
     def __makeGetRequest(
@@ -115,7 +115,7 @@ class Zlibrary:
             params=params,
             cookies=self.__cookies if cookies is None else cookies,
             headers=self.__headers,
-            proxies=self.proxies,
+            proxies=self.__proxies,
         ).json()
 
     def getProfile(self) -> dict[str, str]:

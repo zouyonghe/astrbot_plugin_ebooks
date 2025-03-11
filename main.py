@@ -26,8 +26,12 @@ class ebooks(Star):
         self.proxy = os.environ.get("https_proxy")
         self.TEMP_PATH = os.path.abspath("data/temp")
         os.makedirs(self.TEMP_PATH, exist_ok=True)
-
-        self.zlibrary = Zlibrary(email=config["zlib_email"], password=config["zlib_password"])
+        if self.config.get("enable_zlib", False):
+            try:
+                self.zlibrary = Zlibrary(email=config["zlib_email"], password=config["zlib_password"])
+            except:
+                self.config["enable_zlib"] = False
+                self.config.save_config()
 
     async def is_url_accessible(self, url: str) -> bool:
         """
@@ -943,9 +947,6 @@ class ebooks(Star):
 
             logger.info(f"[Z-Library] Received books search query: {query}, limit: {limit}")
 
-            # 登录 Zlibrary
-            self.zlibrary.login(email=self.config["zlib_email"], password=self.config["zlib_password"])
-
             # 调用 Zlibrary 的 search 方法进行搜索
             results = self.zlibrary.search(message=query, limit=limit)
 
@@ -1009,9 +1010,6 @@ class ebooks(Star):
             return
 
         try:
-            # 登录 Zlibrary
-            self.zlibrary.login(email=self.config["zlib_email"], password=self.config["zlib_password"])
-
             # 获取电子书详情，确保 ID 合法
             book_details = self.zlibrary.getBookInfo(book_id, hashid=book_hash)
             if not book_details:
@@ -1255,3 +1253,7 @@ class ebooks(Star):
         """
         async for result in self.download_all_platforms(event, arg1, arg2):
             yield result
+
+    @command("test")
+    async def test(self, event: AstrMessageEvent):
+        yield event.chain_result([Image.fromURL("https://s3proxy.cdn-zlib.sk/covers400/c ollections/genesis/52f375b13029a198139b8101a6977c9aec5c4ad3e18ff8beaf4ea3c15615db9a.jpg ")])

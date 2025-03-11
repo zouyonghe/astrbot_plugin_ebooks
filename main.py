@@ -40,10 +40,10 @@ class ebooks(Star):
             async with aiohttp.ClientSession() as session:
                 if prxoy:
                     async with session.head(url, timeout=3, allow_redirects=True) as response:
-                        return response.status == 200  # 返回状态是否为 200
+                        return response.status == 200
                 else:
                     async with session.head(url, timeout=3, proxy=self.proxy, allow_redirects=True) as response:
-                    return response.status == 200  # 返回状态是否为 200
+                        return response.status == 200
         except:
             return False  # 如果请求失败（超时、连接中断等）则返回 False
 

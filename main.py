@@ -1172,18 +1172,16 @@ class ebooks(Star):
 
         try:
             # 并发运行所有任务
-            for search_results in asyncio.as_completed(tasks):
-                try:
-                    # 将任务结果逐一发送
-                    for platform_results in search_results:  # 遍历每个平台结果
-                        for result in platform_results:  # 遍历具体某个平台的单个结果
-                            try:
-                                yield result
-                            except Exception as e:
-                                logger.error(f"[ebooks] 处理结果时出现异常: {e}")
-                                continue
-                except Exception as e:
-                    logger.error(f"[ebooks] 执行任务时出现异常: {e}")
+            search_results = await asyncio.gather(*tasks)
+
+            # 将任务结果逐一发送
+            for platform_results in search_results:  # 遍历每个平台结果
+                for result in platform_results:  # 遍历具体某个平台的单个结果
+                    try:
+                        yield result
+                    except Exception as e:
+                        logger.error(f"[ebooks] 处理结果时出现异常: {e}")
+                        continue
 
         except Exception as e:
             logger.error(f"[ebooks] Error during multi-platform search: {e}")

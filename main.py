@@ -1279,4 +1279,21 @@ class ebooks(Star):
 
     @command("test")
     async def test(self, event: AstrMessageEvent):
-        yield event.chain_result([Image.fromURL("https://archive.org/services/img/6c-506a-9e-69065a-3c-4f-57c-99d-264e-801b")])
+        yield event.chain_result([Image.fromURL("https://archive.org/services/img/6c-506a-9e-69065a-3c-4f-57c-99d-264e-801b", use_proxy=True)])
+        ns = Nodes([])
+        n_in = Node(
+            uin=event.get_self_id(),
+            name="test",
+            content="test",
+        )
+        n_out = Node(
+            uin=event.get_self_id(),
+            name="test",
+            content=n_in,
+        )
+        ns.nodes.append(n_out)
+        ns.nodes.append(n_out)
+
+        yield event.chain_result([ns])
+
+

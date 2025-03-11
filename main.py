@@ -39,10 +39,10 @@ class ebooks(Star):
         try:
             async with aiohttp.ClientSession() as session:
                 if prxoy:
-                    async with session.head(url, timeout=10, allow_redirects=True) as response:
+                    async with session.head(url, timeout=10, proxy=self.proxy, allow_redirects=True) as response:
                         return response.status == 200
                 else:
-                    async with session.head(url, timeout=10, proxy=self.proxy, allow_redirects=True) as response:
+                    async with session.head(url, timeout=10, allow_redirects=True) as response:
                         return response.status == 200
         except:
             return False  # 如果请求失败（超时、连接中断等）则返回 False
@@ -1155,16 +1155,18 @@ class ebooks(Star):
 
         try:
             # 并发运行所有任务
-            search_results = await asyncio.gather(*tasks)
-
-            # 将任务结果逐一发送
-            for platform_results in search_results:  # 遍历每个平台结果
-                for result in platform_results:  # 遍历具体某个平台的单个结果
-                    try:
-                        yield result
-                    except Exception as e:
-                        logger.error(f"[ebooks] 处理结果时出现异常: {e}")
-                        continue
+            for search_results in asyncio.as_completed(tasks):
+                try:
+                    # 将任务结果逐一发送
+                    for platform_results in search_results:  # 遍历每个平台结果
+                        for result in platform_results:  # 遍历具体某个平台的单个结果
+                            try:
+                                yield result
+                            except Exception as e:
+                                logger.error(f"[ebooks] 处理结果时出现异常: {e}")
+                                continue
+                except Exception as e:
+                    logger.error(f"[ebooks] 执行任务时出现异常: {e}")
 
         except Exception as e:
             logger.error(f"[ebooks] Error during multi-platform search: {e}")

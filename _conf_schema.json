@@ -1,4 +1,28 @@
 {
+    "enable_calibre": {
+        "type": "bool",
+        "description": "启用 Calibre-Web 电子书搜索",
+        "default": false,
+        "hint": "若启用需要部署 Calibre-Web 并配置服务的URL"
+    },
+    "enable_liber3": {
+        "type": "bool",
+        "description": "启用 Liber3 电子书搜索",
+        "default": true,
+        "hint": "默认启用，网络不连通时可禁用"
+    },
+    "enable_archive": {
+        "type": "bool",
+        "description": "启用 Archive.org 电子书搜索",
+        "default": true,
+        "hint": "默认启用，网络不连通时可禁用"
+    },
+    "enable_zlib": {
+        "type": "bool",
+        "description": "启用 Z-Library 电子书搜索",
+        "default": false,
+        "hint": "若启用需要配置 Z-Library 的登录账户"
+    },
     "calibre_web_url": {
         "type": "string",
         "description": "calibre-web 地址",

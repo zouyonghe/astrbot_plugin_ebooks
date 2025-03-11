@@ -74,7 +74,7 @@ class ebooks(Star):
                 base64_data = base64.b64encode(content).decode("utf-8")
                 if self.is_base64_image(base64_data):  # 检查 Base64 数据是否有效
                     return base64_data
-        except Exception as e:
+        except:
             return None
 
     def is_base64_image(self, base64_data: str) -> bool:
@@ -261,13 +261,33 @@ class ebooks(Star):
 
         yield event.chain_result([ns])
 
+    def is_valid_calibre_book_url(self, book_url: str) -> bool:
+        """检测电子书下载链接格式是否合法"""
+        if not book_url:
+            return False  # URL 不能为空
+
+        # 检测是否是合法的 URL (基础验证)
+        pattern = re.compile(r'^https?://.+/.+$')
+        if not pattern.match(book_url):
+            return False
+
+        # 检查是否满足特定的结构，例如包含 /opds/download/
+        if "/opds/download/" not in book_url:
+            return False
+
+        return True
+
     @command_group("calibre")
     def calibre(self):
         pass
 
     @calibre.command("search")
-    async def search_calibre(self, event: AstrMessageEvent, query: str="Calibre-Web 搜索结果", limit: str="20"):
+    async def search_calibre(self, event: AstrMessageEvent, query: str, limit: str="20"):
         '''搜索 calibre-web 电子书目录'''
+        if not self.config.get("enable_calibre", False):
+            yield event.plain_result("[Calibre-Web] 功能未启用。")
+            return
+
         if not query:
             yield event.plain_result("[Calibre-Web] 请提供电子书关键词以进行搜索。")
             return
@@ -290,15 +310,19 @@ class ebooks(Star):
             yield event.plain_result("[Calibre-Web] 搜索电子书时发生错误，请稍后再试。")
 
     @calibre.command("download")
-    async def download(self, event: AstrMessageEvent, ebook_url: str = None):
+    async def download_calibre(self, event: AstrMessageEvent, book_url: str = None):
         '''下载 calibre-web 电子书'''
-        if not ebook_url:
-            yield event.plain_result("[Calibre-Web] 请输入电子书的下载链接。")
+        if not self.config.get("enable_calibre", False):
+            yield event.plain_result("[Calibre-Web] 功能未启用。")
+            return
+
+        if not self.is_valid_calibre_book_url(book_url):
+            yield event.plain_result("[Calibre-Web] 请提供有效的电子书链接。")
             return
 
         try:
             async with aiohttp.ClientSession() as session:
-                async with session.get(ebook_url) as response:
+                async with session.get(book_url) as response:
                     if response.status == 200:
                         # 从 Content-Disposition 提取文件名
                         content_disposition = response.headers.get("Content-Disposition")
@@ -318,12 +342,12 @@ class ebooks(Star):
 
                         # 如果未获取到文件名，使用默认值
                         if not book_name or book_name.strip() == "":
-                            logger.error(f"[Calibre-Web] 无法提取书名，电子书地址: {ebook_url}")
+                            logger.error(f"[Calibre-Web] 无法提取书名，电子书地址: {book_url}")
                             yield event.plain_result("[Calibre-Web] 无法提取书名，取消发送电子书。")
                             return 
                             
                         # 发送文件到用户
-                        file = File(name=book_name, file=ebook_url)
+                        file = File(name=book_name, file=book_url)
                         yield event.chain_result([file])
                     else:
                         yield event.plain_result(f"[Calibre-Web] 无法下载电子书，状态码: {response.status}")
@@ -334,6 +358,10 @@ class ebooks(Star):
     @calibre.command("recommend")
     async def recommend_calibre(self, event: AstrMessageEvent, n: int):
         '''随机推荐 n 本电子书'''
+        if not self.config.get("enable_calibre", False):
+            yield event.plain_result("[Calibre-Web] 功能未启用。")
+            return
+
         try:
             # 调用 Calibre-Web 搜索接口，默认搜索所有电子书
             query = "*"  # 空查询，可以调出完整书目
@@ -366,7 +394,7 @@ class ebooks(Star):
         When to use:
             Use this method to search for books in the Calibre-Web catalog when user knows the title or keyword.
             This method cannot be used for downloading books and should only be used for searching purposes.
-    
+
         Args:
             query (string): The search keyword or title to find books in the Calibre-Web catalog.
         """
@@ -374,40 +402,17 @@ class ebooks(Star):
             yield result
 
     # @llm_tool("download_calibre_book")
-    async def download_calibre_book(self, event: AstrMessageEvent, book_identifier: str):
+    async def download_calibre_book(self, event: AstrMessageEvent, book_url: str):
         """Download a book by a precise name or URL through Calibre-Web.
         When to use:
             Use this method to download a specific book by its name or when a direct download link is available.
     
         Args:
-            book_identifier (string): The book name (exact match) or the URL of the book link.
+            book_url (string): The book name (exact match) or the URL of the book link.
 
         """
-        try:
-            ebook_url = ""
-            # First, determine if the identifier is a URL or a book name
-            if book_identifier.lower().startswith("http://") or book_identifier.lower().startswith("https://"):
-                ebook_url = book_identifier
-            else:
-                # Search the book by name
-                results = await self._search_calibre_web(quote_plus(book_identifier))
-                matched_books = [
-                    book for book in results if book_identifier.lower() in book["title"].lower()
-                ]
-
-                if len(matched_books) == 1:
-                    ebook_url = matched_books[0]["download_link"]
-                elif len(matched_books) > 1:
-                    async for result in self._show_calibre_result(event, results, guidance="请使用链接下载电子书。\n"):
-                        yield result
-                else:
-                    yield event.plain_result("[Calibre-Web] 未能找到匹配的电子书，请提供准确书名或电子书下载链接。")
-                    return
-            async for result in self.download(event, ebook_url):
-                yield result
-        except Exception as e:
-            logger.error(f"[Calibre-Web] Error handling book download: {e}")
-            yield event.plain_result("[Calibre-Web] 下载电子书时发生错误，请稍后再试。")
+        async for result in self.download_calibre(event, book_url):
+            yield result
 
     @llm_tool("recommend_books")
     async def recommend_calibre_books(self, event: AstrMessageEvent, n: str = "5"):
@@ -491,6 +496,15 @@ class ebooks(Star):
 
         return None
 
+    def is_valid_liber3_book_id(self, book_id: str) -> bool:
+        """检测 Liber3 的 book_id 是否有效"""
+        if not book_id:
+            return False  # 不能为空
+
+        # 使用正则表达式验证是否是 32 位大写十六进制字符串
+        pattern = re.compile(r'^[a-fA-F0-9]{32}$')
+        return bool(pattern.match(book_id))
+
     @command_group("liber3")
     def liber3(self):
         pass
@@ -498,9 +512,14 @@ class ebooks(Star):
     @liber3.command("search")
     async def search_liber3(self, event: AstrMessageEvent, query: str = None, limit: str="20"):
         """搜索电子书并输出详细信息"""
+        if not self.config.get("enable_liber3", False):
+            yield event.plain_result("[Liber3] 功能未启用。")
+            return
+
         if not query:
             yield event.plain_result("[Liber3] 请提供电子书关键词以进行搜索。")
             return
+
         limit = int(limit) if limit.isdigit() else 20
         if not (1 <= limit <= 50):  # Validate limit
             yield event.plain_result("[Liber3] 请确认搜索返回结果数量在 1-50 之间。")
@@ -545,7 +564,11 @@ class ebooks(Star):
 
     @liber3.command("download")
     async def download_liber3(self, event: AstrMessageEvent, book_id: str = None):
-        if not book_id:
+        if not self.config.get("enable_liber3", False):
+            yield event.plain_result("[Liber3] 功能未启用。")
+            return
+
+        if not self.is_valid_liber3_book_id(book_id):
             yield event.plain_result("[Liber3] 请提供有效的电子书 ID。")
             return
 
@@ -722,6 +745,18 @@ class ebooks(Star):
         soup = BeautifulSoup(html_content, "html.parser")
         return soup.get_text().strip()
 
+    def is_valid_archive_book_url(self, book_url: str) -> bool:
+        """检测 archive.org 下载链接格式是否合法"""
+        if not book_url:
+            return False  # URL 不能为空
+
+        # 使用正则表达式验证链接格式是否合法
+        pattern = re.compile(
+            r'^https://archive\.org/download/[^/]+/[^/]+$'
+        )
+
+        return bool(pattern.match(book_url))
+
     @command_group("archive")
     def archive(self):
         pass
@@ -734,6 +769,10 @@ class ebooks(Star):
                 query (str): The book title or keywords to search for (required).
                 limit (str): The result limit, default is 20.
         """
+        if not self.config.get("enable_archive", False):
+            yield event.plain_result("[Archive] 功能未启用。")
+            return
+
         if not query:
             yield event.plain_result("[Archive] 请提供电子书关键词以进行搜索。")
             return
@@ -779,19 +818,23 @@ class ebooks(Star):
             yield event.plain_result("[Archive] 搜索电子书时发生错误，请稍后再试。")
 
     @archive.command("download")
-    async def download_archive(self, event: AstrMessageEvent, download_url: str = None):
+    async def download_archive(self, event: AstrMessageEvent, book_url: str = None):
         """Download an eBook from the Archive platform using a provided link.
             Args:
-                download_url (str): The download URL of the eBook.
+                book_url (str): The download URL of the eBook.
         """
-        if not download_url:
+        if not self.config.get("enable_archive", False):
+            yield event.plain_result("[Archive] 功能未启用。")
+            return
+
+        if not self.is_valid_archive_book_url(book_url):
             yield event.plain_result("[Archive] 请提供有效的下载链接。")
             return
 
         try:
             async with aiohttp.ClientSession() as session:
                 # 发出 GET 请求并跟随跳转
-                async with session.get(download_url, allow_redirects=True, proxy=self.proxy) as response:
+                async with session.get(book_url, allow_redirects=True, proxy=self.proxy) as response:
                     if response.status == 200:
                         ebook_url = str(response.url)
                         logger.debug(f"[Archive] 跳转后的下载地址: {ebook_url}")
@@ -864,6 +907,19 @@ class ebooks(Star):
         async for result in self.download_archive(event, download_url):
             yield result
 
+    def is_valid_zlib_book_id(self, book_id: str) -> bool:
+        """检测 zlib ID 是否为纯数字"""
+        if not book_id:
+            return False
+        return book_id.isdigit()
+
+    def is_valid_zlib_book_hash(self, hash: str) -> bool:
+        """检测 zlib Hash 是否为 6 位十六进制"""
+        if not hash:
+            return False
+        pattern = re.compile(r'^[a-f0-9]{6}$', re.IGNORECASE)  # 忽略大小写
+        return bool(pattern.match(hash))
+
     @command_group("zlib")
     def zlib(self):
         pass
@@ -871,6 +927,10 @@ class ebooks(Star):
     @zlib.command("search")
     async def search_zlib(self, event: AstrMessageEvent, query: str = None, limit: str = "20"):
         """搜索 Zlibrary 电子书并输出详细信息"""
+        if not self.config.get("enable_zlib", False):
+            yield event.plain_result("[Z-Library] 功能未启用。")
+            return
+
         if not query:
             yield event.plain_result("[Z-Library] 请提供电子书关键词以进行搜索。")
             return
@@ -910,7 +970,7 @@ class ebooks(Star):
                 chain.append(Plain(f"作者: {book.get('author', '未知')}\n"))
                 chain.append(Plain(f"年份: {book.get('year', '未知')}\n"))
                 publisher = book.get("publisher", None)
-                if not publisher or publisher is "None":
+                if not publisher or publisher == "None":
                     publisher = "未知"
                 chain.append(Plain(f"出版社: {publisher}\n"))
                 chain.append(Plain(f"语言: {book.get('language', '未知')}\n"))
@@ -940,7 +1000,11 @@ class ebooks(Star):
     @zlib.command("download")
     async def download_zlib(self, event: AstrMessageEvent, book_id: str = None, book_hash: str = None):
         """下载 Z-Library 电子书"""
-        if not book_id or not book_hash:
+        if not self.config.get("enable_zlib", False):
+            yield event.plain_result("[Z-Library] 功能未启用。")
+            return
+
+        if not self.is_valid_zlib_book_id(book_id) or not self.is_valid_zlib_book_hash(book_hash):
             yield event.plain_result("请使用 /zlib download <id> <hash> 下载。")
             return
 
@@ -1081,14 +1145,19 @@ class ebooks(Star):
         zlibrary_task = consume_generator_async(self.search_zlib(event, query, limit))
         archive_task = consume_generator_async(self.search_archive(event, query, limit))
 
+        tasks = []
+        if self.config.get("enable_calibre", False):
+            tasks.append(calibre_task)
+        if self.config.get("enable_liber3", False):
+            tasks.append(liber3_task)
+        if self.config.get("enable_archive", False):
+            tasks.append(archive_task)
+        if self.config.get("enable_zlib", False):
+            tasks.append(zlibrary_task)
+
         try:
             # 并发运行所有任务
-            search_results = await asyncio.gather(
-                calibre_task,
-                liber3_task,
-                archive_task,
-                zlibrary_task
-            )
+            search_results = await asyncio.gather(*tasks)
 
             # 将任务结果逐一发送
             for platform_results in search_results:  # 遍历每个平台结果
@@ -1120,7 +1189,7 @@ class ebooks(Star):
             if arg1 and arg2:  # 检查两个参数是否都存在
                 try:
                     logger.info("[ebooks] 检测到 Z-Library ID 和 Hash，开始下载...")
-                    async for result in self.download_zlib_book(event, arg1, arg2):
+                    async for result in self.download_zlib(event, arg1, arg2):
                         yield result
                 except Exception as e:
                     yield event.plain_result(f"[ebooks] Z-Library 参数解析失败：{e}")
@@ -1130,21 +1199,21 @@ class ebooks(Star):
             if arg1.startswith("http://") or arg1.startswith("https://"):
                 if "/opds/download/" in arg1:
                     logger.info("[ebooks] 检测到 Calibre-Web 链接，开始下载...")
-                    async for result in self.download_calibre_book(event, arg1):
+                    async for result in self.download_calibre(event, arg1):
                         yield result
                     return
 
                 # Archive.org 下载
                 if "archive.org/download/" in arg1:
                     logger.info("[ebooks] 检测到 Archive.org 链接，开始下载...")
-                    async for result in self.download_archive_book(event, arg1):
+                    async for result in self.download_archive(event, arg1):
                         yield result
                     return
 
             # Liber3 下载
             if len(arg1) == 32 and re.match(r"^[A-Fa-f0-9]{32}$", arg1):  # 符合 Liber3 的 ID 格式
                 logger.info("[ebooks] ⏳ 检测到 Liber3 ID，开始下载...")
-                async for result in self.download_liber3_book(event, arg1):
+                async for result in self.download_liber3(event, arg1):
                     yield result
                 return
 

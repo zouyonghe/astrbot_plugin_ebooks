@@ -1022,9 +1022,7 @@ class ebooks(Star):
             return
 
         if not await self.is_url_accessible("https://z-library.sk"):
-            yield event.plain_result("[Z-Library] 无法连接到 Z-Library，已禁用。")
-            self.config["enable_zlib"] = False
-            self.config.save_config()
+            yield event.plain_result("[Z-Library] 无法连接到 Z-Library。")
             return
 
         if not self.is_valid_zlib_book_id(book_id) or not self.is_valid_zlib_book_hash(book_hash):
@@ -1281,4 +1279,4 @@ class ebooks(Star):
 
     @command("test")
     async def test(self, event: AstrMessageEvent):
-        yield event.chain_result([Image.fromURL("https://s3proxy.cdn-zlib.sk/covers400/c ollections/genesis/52f375b13029a198139b8101a6977c9aec5c4ad3e18ff8beaf4ea3c15615db9a.jpg ")])
+        yield event.chain_result([Image.fromURL("https://archive.org/services/img/6c-506a-9e-69065a-3c-4f-57c-99d-264e-801b")])

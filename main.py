@@ -136,18 +136,18 @@ class ebooks(Star):
             for entry in entries:
                 # 提取电子书标题
                 title_element = entry.find("default:title", namespace)
-                title = title_element.text if title_element is not None else "未知标题"
+                title = title_element.text if title_element is not None else "未知"
 
                 # 提取作者，多作者场景
                 authors = []
                 author_elements = entry.findall("default:author/default:name", namespace)
                 for author in author_elements:
-                    authors.append(author.text if author is not None else "未知作者")
-                authors = ", ".join(authors) if authors else "未知作者"
+                    authors.append(author.text if author is not None else "未知")
+                authors = ", ".join(authors) if authors else "未知"
 
                 # 提取描述（<summary>）
                 summary_element = entry.find("default:summary", namespace)
-                summary = summary_element.text if summary_element is not None else "暂无描述"
+                summary = summary_element.text if summary_element is not None else "无描述"
 
                 # 提取出版日期（<published>）
                 published_element = entry.find("default:published", namespace)
@@ -157,9 +157,9 @@ class ebooks(Star):
                         # 解析日期字符串为 datetime 对象，并提取年份
                         year = datetime.fromisoformat(published_element.text).year
                     except ValueError:
-                        year = "未知年份"  # 日期解析失败时处理
+                        year = "未知"  # 日期解析失败时处理
                 else:
-                    year = "未知年份"
+                    year = "未知"
 
                 # 提取语言（<dcterms:language>），需注意 namespace
                 lang_element = entry.find("default:dcterms:language", namespace)

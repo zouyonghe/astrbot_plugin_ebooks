@@ -1211,6 +1211,7 @@ class ebooks(Star):
             search_results = await asyncio.gather(*tasks)
             # 将任务结果逐一发送
             ns = Nodes([])
+
             for platform_results in search_results:  # 遍历每个平台结果
                 node = Node(
                     uin=event.get_self_id(),
@@ -1218,6 +1219,8 @@ class ebooks(Star):
                     content=platform_results,
                 )
                 ns.nodes.append(node)
+                ns_test = Nodes(platform_results)
+                yield event.chain_result([ns_test])
             yield event.chain_result([ns])
 
         except Exception as e:

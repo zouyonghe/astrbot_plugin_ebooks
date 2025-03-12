@@ -163,11 +163,11 @@ class ebooks(Star):
 
                 # 提取语言（<dcterms:language>），需注意 namespace
                 lang_element = entry.find("default:dcterms:language", namespace)
-                language = lang_element.text if lang_element is not None else "未知语言"
+                language = lang_element.text if lang_element is not None else "未知"
 
                 # 提取出版社信息（<publisher>）
                 publisher_element = entry.find("default:publisher/default:name", namespace)
-                publisher = publisher_element.text if publisher_element is not None else "未知出版社"
+                publisher = publisher_element.text if publisher_element is not None else "未知"
 
                 # 提取图书封面链接（rel="http://opds-spec.org/image"）
                 cover_element = entry.find("default:link[@rel='http://opds-spec.org/image']", namespace)
@@ -193,12 +193,12 @@ class ebooks(Star):
                         download_link = urljoin(calibre_web_url, download_suffix)
                     else:
                         download_link = ""
-                    file_type = acquisition_element.attrib.get("type", "未知格式")
-                    file_size = acquisition_element.attrib.get("length", "未知大小")
+                    file_type = acquisition_element.attrib.get("type", "未知")
+                    file_size = acquisition_element.attrib.get("length", "未知")
                 else:
                     download_link = ""
-                    file_type = "未知格式"
-                    file_size = "未知格式"
+                    file_type = "未知"
+                    file_size = "未知"
 
                 # 构建结果
                 results.append({
@@ -228,8 +228,10 @@ class ebooks(Star):
         :return: 生成的消息链列表
         """
         chain = [Plain(f"{item['title']}")]
-        if item.get("cover_link") and await self._is_url_accessible(item.get("cover_link"), False):
-            chain.append(Image.fromURL(item["cover_link"]))
+        if item.get("cover_link"):
+            base64_image = await self._download_and_convert_to_base64(item["cover_link"])
+            if self._is_base64_image(base64_image):
+                chain.append(Image.fromBase64(base64_image))
         else:
             chain.append(Plain("\n"))
         chain.append(Plain(f"作者: {item.get('authors', '未知')}\n"))
@@ -245,23 +247,21 @@ class ebooks(Star):
         chain.append(Plain(f"链接(用于下载): {item.get('download_link', '未知')}"))
         return chain
 
-    async def _convert_calibre_results_to_nodes(self, event: AstrMessageEvent, results: list, guidance: str = None):
+    async def _convert_calibre_results_to_nodes(self, event: AstrMessageEvent, results: list):
         if not results:
             return "[Calibre-Web] 未找到匹配的电子书。"
 
-        nodes = []
-        if guidance:
-            nodes.append(Node(uin=event.get_self_id(), name="Calibre-Web", content=guidance))
-
-        for item in results:
-            chain = await self._build_book_chain(item)
-            node = Node(
+        async def construct_node(book):
+            """异步构造单个节点"""
+            chain = await self._build_book_chain(book)
+            return Node(
                 uin=event.get_self_id(),
                 name="Calibre-Web",
                 content=chain
             )
-            nodes.append(node)
-        return nodes
+
+        tasks = [construct_node(book) for book in results]
+        return await asyncio.gather(*tasks)
 
     async def _search_calibre_nodes(self, event: AstrMessageEvent, query: str, limit: str = "20"):
         if not self.config.get("enable_calibre", False):
@@ -387,14 +387,17 @@ class ebooks(Star):
             recommended_books = random.sample(results, n)
 
             # 显示推荐电子书
-            guidance = f"[Calibre-Web] 如下是随机推荐的 {n} 本电子书。"
-            result = await self._convert_calibre_results_to_nodes(event, recommended_books, guidance)
+            result = await self._convert_calibre_results_to_nodes(event, recommended_books)
+
             if isinstance(result, str):
                 yield event.plain_result(result)
             elif isinstance(result, list):
-                nodes = Nodes([])
-                nodes.nodes = result
-                yield event.chain_result([nodes])
+                guidance = f"[Calibre-Web] 如下是随机推荐的 {n} 本电子书。"
+                nodes = [Node(uin=event.get_self_id(), name="Calibre-Web", content=guidance)]
+                nodes.extend(result)
+                ns = Nodes([])
+                ns.nodes = nodes
+                yield event.chain_result([ns])
             else:
                 yield event.plain_result("[Calibre-Web] 生成结果失败。")
 
@@ -538,8 +541,32 @@ class ebooks(Star):
             detailed_books = results.get("detailed_books", {})
 
             # 构建 Nodes 对象
-            nodes = []
-            for book in search_results:
+            # nodes = []
+            # for book in search_results:
+            #     book_id = book.get("id")
+            #     detail = detailed_books.get(book_id, {}).get("book", {})
+            #
+            #     # 构建电子书信息内容
+            #     chain = [
+            #         Plain(f"书名: {book.get('title', '未知')}\n"),
+            #         Plain(f"作者: {book.get('author', '未知')}\n"),
+            #         Plain(f"年份: {detail.get('year', '未知')}\n"),
+            #         Plain(f"出版社: {detail.get('publisher', '未知')}\n"),
+            #         Plain(f"语言: {detail.get('language', '未知')}\n"),
+            #         Plain(f"文件大小: {detail.get('filesize', '未知')}\n"),
+            #         Plain(f"文件类型: {detail.get('extension', '未知')}\n"),
+            #         Plain(f"ID(用于下载): {book_id}"),
+            #     ]
+            #
+            #     node = Node(
+            #         uin=event.get_self_id(),
+            #         name="Liber3",
+            #         content=chain
+            #     )
+            #     nodes.append(node)
+            # return nodes
+            async def construct_node(book):
+                """异步构造单个节点"""
                 book_id = book.get("id")
                 detail = detailed_books.get(book_id, {}).get("book", {})
 
@@ -555,14 +582,14 @@ class ebooks(Star):
                     Plain(f"ID(用于下载): {book_id}"),
                 ]
 
-                node = Node(
+                # 构造节点
+                return Node(
                     uin=event.get_self_id(),
                     name="Liber3",
                     content=chain
                 )
-                nodes.append(node)
-            return nodes
-
+            tasks = [construct_node(book) for book in search_results]
+            return await asyncio.gather(*tasks)
         except Exception as e:
             logger.error(f"[Liber3] 搜索失败: {e}")
             return "[Liber3] 发生错误，请稍后再试。"
@@ -796,11 +823,11 @@ class ebooks(Star):
         if not self.config.get("enable_archive", False):
             return "[Archive] 功能未启用。"
 
-        if not await self._is_url_accessible("https://archive.org"):
-            return "[Archive] 无法连接到 Archive.org。"
-
         if not query:
             return "[Archive] 请提供电子书关键词以进行搜索。"
+
+        if not await self._is_url_accessible("https://archive.org"):
+            return "[Archive] 无法连接到 Archive.org。"
 
         limit = int(limit) if limit.isdigit() else 20
         if not (1 <= limit <= 50):  # Validate limit
@@ -812,18 +839,21 @@ class ebooks(Star):
             if not results:
                 return "[Archive] 未找到匹配的电子书。"
 
-            # 返回结果到用户
-            nodes = []
-            for book in results:
+            async def construct_node(book):
+                """异步构造单个节点"""
                 chain = [Plain(f"{book.get('title', '未知')}")]
-                if book.get("cover") and await self._is_url_accessible(book.get("cover")):
+
+                # 异步下载和处理封面图片
+                if book.get("cover"):
                     base64_image = await self._download_and_convert_to_base64(book.get("cover"))
-                    if base64_image:
+                    if base64_image and self._is_base64_image(base64_image):
                         chain.append(Image.fromBase64(base64_image))
                     else:
                         chain.append(Plain("\n"))
                 else:
                     chain.append(Plain("\n"))
+
+                # 添加其他信息
                 chain.append(Plain(f"作者: {book.get('authors', '未知')}\n"))
                 chain.append(Plain(f"年份: {book.get('year', '未知')}\n"))
                 chain.append(Plain(f"出版社: {book.get('publisher', '未知')}\n"))
@@ -831,9 +861,12 @@ class ebooks(Star):
                 chain.append(Plain(f"简介: {book.get('description', '无简介')}\n"))
                 chain.append(Plain(f"链接(用于下载): {book.get('download_url', '未知')}"))
 
-                node = Node(uin=event.get_self_id(), name="Archive", content=chain)
-                nodes.append(node)
-            return nodes
+                # 构造 Node
+                return Node(uin=event.get_self_id(), name="Archive", content=chain)
+            tasks = [construct_node(book) for book in results]
+            return await asyncio.gather(*tasks)  # 并发执行所有任务
+
+            # return nodes
         except Exception as e:
             logger.error(f"[Archive] Error processing Archive search request: {e}")
             return "[Archive] 搜索电子书时发生错误，请稍后再试。"
@@ -863,12 +896,12 @@ class ebooks(Star):
             yield event.plain_result("[Archive] 功能未启用。")
             return
 
-        if not await self._is_url_accessible("https://archive.org"):
-            yield event.plain_result("[Archive] 无法连接到 Archive.org")
-            return
-
         if not self._is_valid_archive_book_url(book_url):
             yield event.plain_result("[Archive] 请提供有效的下载链接。")
+            return
+
+        if not await self._is_url_accessible("https://archive.org"):
+            yield event.plain_result("[Archive] 无法连接到 Archive.org")
             return
 
         try:
@@ -975,43 +1008,54 @@ class ebooks(Star):
 
             # 处理搜索结果
             books = results.get("books", [])
-            nodes = []
-
-            for book in books:
+            async def construct_node(book):
+                """异步构造单个节点"""
                 chain = [Plain(f"{book.get('title', '未知')}")]
-                if book.get("cover") and await self._is_url_accessible(book.get("cover")):
+
+                # 异步处理封面图片
+                if book.get("cover"):
                     base64_image = await self._download_and_convert_to_base64(book.get("cover"))
-                    if base64_image:
+                    if base64_image and self._is_base64_image(base64_image):
                         chain.append(Image.fromBase64(base64_image))
                     else:
                         chain.append(Plain("\n"))
                 else:
                     chain.append(Plain("\n"))
+
+                # 添加书籍信息
                 chain.append(Plain(f"作者: {book.get('author', '未知')}\n"))
                 chain.append(Plain(f"年份: {book.get('year', '未知')}\n"))
+
+                # 处理出版社信息
                 publisher = book.get("publisher", None)
                 if not publisher or publisher == "None":
                     publisher = "未知"
                 chain.append(Plain(f"出版社: {publisher}\n"))
+
+                # 语言信息
                 chain.append(Plain(f"语言: {book.get('language', '未知')}\n"))
+
+                # 处理简介
                 description = book.get("description", "无简介")
-                if isinstance(description, str) and description != "":
+                if isinstance(description, str) and description.strip() != "":
                     description = description.strip()
                     description = description[:150] + "..." if len(description) > 150 else description
                 else:
                     description = "无简介"
                 chain.append(Plain(f"简介: {description}\n"))
+
+                # ID 和 Hash 信息
                 chain.append(Plain(f"ID(用于下载): {book.get('id')}\n"))
                 chain.append(Plain(f"Hash(用于下载): {book.get('hash')}"))
 
-                node = Node(
+                # 构造节点
+                return Node(
                     uin=event.get_self_id(),
                     name="Z-Library",
                     content=chain,
                 )
-                nodes.append(node)
-            return nodes
-
+            tasks = [construct_node(book) for book in books]
+            return await asyncio.gather(*tasks)
         except Exception as e:
             logger.error(f"[Z-Library] Error during book search: {e}")
             return "[Z-Library] 搜索电子书时发生错误，请稍后再试。"

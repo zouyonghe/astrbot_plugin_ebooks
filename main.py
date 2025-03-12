@@ -18,7 +18,7 @@ from astrbot.api.all import *
 from astrbot.api.event.filter import *
 
 
-@register("ebooks", "buding", "一个功能强大的电子书搜索和下载插件", "1.0.2", "https://github.com/zouyonghe/astrbot_plugin_ebooks")
+@register("ebooks", "buding", "一个功能强大的电子书搜索和下载插件", "1.0.3", "https://github.com/zouyonghe/astrbot_plugin_ebooks")
 class ebooks(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
         super().__init__(context)
@@ -28,7 +28,7 @@ class ebooks(Star):
         os.makedirs(self.TEMP_PATH, exist_ok=True)
         self.zlibrary = None
 
-    async def is_url_accessible(self, url: str, proxy: bool=True) -> bool:
+    async def _is_url_accessible(self, url: str, proxy: bool=True) -> bool:
         """
         异步检查给定的 URL 是否可访问。
 
@@ -47,7 +47,7 @@ class ebooks(Star):
         except:
             return False  # 如果请求失败（超时、连接中断等）则返回 False
 
-    async def download_and_convert_to_base64(self, cover_url):
+    async def _download_and_convert_to_base64(self, cover_url):
         try:
             async with aiohttp.ClientSession() as session:
                 async with session.get(cover_url, proxy=self.proxy) as response:
@@ -64,7 +64,7 @@ class ebooks(Star):
                         if img_tag:
                             cover_url = img_tag.get('content')
                             # 再次尝试下载真正的图片地址
-                            return await self.download_and_convert_to_base64(cover_url)
+                            return await self._download_and_convert_to_base64(cover_url)
                         else:
                             return None
 
@@ -76,12 +76,12 @@ class ebooks(Star):
             # 尝试已接收的数据部分
             if 'content' in locals():  # 如果部分内容已下载
                 base64_data = base64.b64encode(content).decode("utf-8")
-                if self.is_base64_image(base64_data):  # 检查 Base64 数据是否有效
+                if self._is_base64_image(base64_data):  # 检查 Base64 数据是否有效
                     return base64_data
         except:
             return None
 
-    def is_base64_image(self, base64_data: str) -> bool:
+    def _is_base64_image(self, base64_data: str) -> bool:
         """
         检测 Base64 数据是否为有效图片
         :param base64_data: Base64 编码的字符串
@@ -220,7 +220,7 @@ class ebooks(Star):
             logger.error(f"[Calibre-Web] Error parsing OPDS response: {e}")
             return None
 
-    async def build_book_chain(self, item: dict) -> list:
+    async def _build_book_chain(self, item: dict) -> list:
         """
         构建对应书籍条目的消息链。
 
@@ -228,7 +228,7 @@ class ebooks(Star):
         :return: 生成的消息链列表
         """
         chain = [Plain(f"{item['title']}")]
-        if item.get("cover_link") and await self.is_url_accessible(item.get("cover_link"), False):
+        if item.get("cover_link") and await self._is_url_accessible(item.get("cover_link"), False):
             chain.append(Image.fromURL(item["cover_link"]))
         else:
             chain.append(Plain("\n"))
@@ -245,27 +245,46 @@ class ebooks(Star):
         chain.append(Plain(f"链接(用于下载): {item.get('download_link', '未知')}"))
         return chain
 
-    async def _show_calibre_result(self, event: AstrMessageEvent, results: list, guidance: str = None):
+    async def _convert_calibre_results_to_nodes(self, event: AstrMessageEvent, results: list, guidance: str = None):
         if not results:
-            yield event.plain_result("[Calibre-Web] 未找到匹配的电子书。")
-            return
+            return "[Calibre-Web] 未找到匹配的电子书。"
 
-        ns = Nodes([])
+        nodes = []
         if guidance:
-            ns.nodes.append(Node(uin=event.get_self_id(), name="Calibre-Web", content=guidance))
+            nodes.append(Node(uin=event.get_self_id(), name="Calibre-Web", content=guidance))
 
         for item in results:
-            chain = await self.build_book_chain(item)
+            chain = await self._build_book_chain(item)
             node = Node(
                 uin=event.get_self_id(),
                 name="Calibre-Web",
                 content=chain
             )
-            ns.nodes.append(node)
+            nodes.append(node)
+        return nodes
 
-        yield event.chain_result([ns])
+    async def _search_calibre_nodes(self, event: AstrMessageEvent, query: str, limit: str = "20"):
+        if not self.config.get("enable_calibre", False):
+            return "[Calibre-Web] 功能未启用。"
 
-    def is_valid_calibre_book_url(self, book_url: str) -> bool:
+        if not query:
+            return "[Calibre-Web] 请提供电子书关键词以进行搜索。"
+
+        limit = int(limit) if limit.isdigit() else 20
+        if not (1 <= limit <= 50):  # Validate limit
+            return "[Calibre-Web] 请确认搜索返回结果数量在 1-50 之间。"
+
+        try:
+            logger.info(f"[Calibre-Web] Received books search query: {query}, limit: {limit}")
+            results = await self._search_calibre_web(quote_plus(query), limit)  # 调用搜索方法
+            if not results or len(results) == 0:
+                return "[Calibre-Web] 未找到匹配的电子书。"
+            else:
+                return await self._convert_calibre_results_to_nodes(event, results)
+        except Exception as e:
+            logger.error(f"[Calibre-Web] 搜索失败: {e}")
+
+    def _is_valid_calibre_book_url(self, book_url: str) -> bool:
         """检测电子书下载链接格式是否合法"""
         if not book_url:
             return False  # URL 不能为空
@@ -287,40 +306,24 @@ class ebooks(Star):
 
     @calibre.command("search")
     async def search_calibre(self, event: AstrMessageEvent, query: str, limit: str="20"):
-        '''搜索 calibre-web 电子书目录'''
-        if not self.config.get("enable_calibre", False):
-            yield event.plain_result("[Calibre-Web] 功能未启用。")
-            return
-
-        if not query:
-            yield event.plain_result("[Calibre-Web] 请提供电子书关键词以进行搜索。")
-            return
-
-        limit = int(limit) if limit.isdigit() else 20
-        if not (1 <= limit <= 50):  # Validate limit
-            yield event.plain_result("[Calibre-Web] 请确认搜索返回结果数量在 1-50 之间。")
-            return
-
-        try:
-            logger.info(f"[Calibre-Web] Received books search query: {query}, limit: {limit}")
-            results = await self._search_calibre_web(quote_plus(query), limit)  # 调用搜索方法
-            if not results or len(results) == 0:
-                yield event.plain_result("[Calibre-Web] 未找到匹配的电子书。")
-            else:
-                async for result in self._show_calibre_result(event, results):
-                    yield result
-        except Exception as e:
-            logger.error(f"[Calibre-Web] 搜索失败: {e}")
-            yield event.plain_result("[Calibre-Web] 搜索电子书时发生错误，请稍后再试。")
+        """搜索 calibre-web 电子书"""
+        result = await self._search_calibre_nodes(event, query, limit)
+        if isinstance(result, str):
+            yield event.plain_result(result)
+        elif isinstance(result, list):
+            ns = Nodes(result)
+            yield event.chain_result([ns])
+        else:
+            raise ValueError("Unknown result type.")
 
     @calibre.command("download")
     async def download_calibre(self, event: AstrMessageEvent, book_url: str = None):
-        '''下载 calibre-web 电子书'''
+        """下载 calibre-web 电子书"""
         if not self.config.get("enable_calibre", False):
             yield event.plain_result("[Calibre-Web] 功能未启用。")
             return
 
-        if not self.is_valid_calibre_book_url(book_url):
+        if not self._is_valid_calibre_book_url(book_url):
             yield event.plain_result("[Calibre-Web] 请提供有效的电子书链接。")
             return
 
@@ -384,9 +387,16 @@ class ebooks(Star):
             recommended_books = random.sample(results, n)
 
             # 显示推荐电子书
-            guidance = f"如下是随机推荐的 {n} 本电子书"
-            async for result in self._show_calibre_result(event, recommended_books, guidance):
-                yield result
+            guidance = f"[Calibre-Web] 如下是随机推荐的 {n} 本电子书。"
+            result = await self._convert_calibre_results_to_nodes(event, recommended_books, guidance)
+            if isinstance(result, str):
+                yield event.plain_result(result)
+            elif isinstance(result, list):
+                nodes = Nodes([])
+                nodes.nodes = result
+                yield event.chain_result([nodes])
+            else:
+                yield event.plain_result("[Calibre-Web] 生成结果失败。")
 
         except Exception as e:
             logger.error(f"[Calibre-Web] 推荐电子书时发生错误: {e}")
@@ -430,7 +440,7 @@ class ebooks(Star):
         async for result in self.recommend_calibre(event, int(n)):
             yield result
             
-    async def get_liber3_book_details(self, book_ids: list) -> Optional[dict]:
+    async def _get_liber3_book_details(self, book_ids: list) -> Optional[dict]:
         """通过电子书 ID 获取详细信息"""
         detail_url = "https://lgate.glitternode.ru/v1/book"
         headers = {"Content-Type": "application/json"}
@@ -452,7 +462,7 @@ class ebooks(Star):
 
         return None
     
-    async def search_liber3_books_with_details(self, word: str, limit: int = 50) -> Optional[dict]:
+    async def _search_liber3_books_with_details(self, word: str, limit: int = 50) -> Optional[dict]:
         """搜索电子书并获取前 limit 本电子书的详细信息"""
         search_url = "https://lgate.glitternode.ru/v1/searchV2"
         headers = {"Content-Type": "application/json"}
@@ -479,7 +489,7 @@ class ebooks(Star):
                             return None
 
                         # 调用详细信息 API
-                        detailed_books = await self.get_liber3_book_details(book_ids)
+                        detailed_books = await self._get_liber3_book_details(book_ids)
                         if not detailed_books:
                             logger.info("[Liber3] 未获取电子书详细信息。")
                             return None
@@ -500,7 +510,64 @@ class ebooks(Star):
 
         return None
 
-    def is_valid_liber3_book_id(self, book_id: str) -> bool:
+    async def _search_liber3_nodes(self, event: AstrMessageEvent, query: str, limit: str = "20"):
+        # 检查功能是否启用
+        if not self.config.get("enable_liber3", False):
+            return "[Liber3] 功能未启用。"
+
+        # 检查是否提供查询关键词
+        if not query:
+            return "[Liber3] 请提供电子书关键词以进行搜索。"
+
+        # 校验 limit 参数
+        limit = int(limit) if limit.isdigit() else 20
+        if not (1 <= limit <= 50):  # 确保返回的结果数量有效
+            return "[Liber3] 请确认搜索返回结果数量在 1-50 之间。"
+
+        try:
+            # 打印日志
+            logger.info(f"[Liber3] Received books search query: {query}, limit: {limit}")
+
+            # 通过 Liber3 API 搜索获得结果
+            results = await self._search_liber3_books_with_details(query, limit)
+            if not results:
+                return "[Liber3] 未找到匹配的电子书。"
+
+            # 提取搜索结果和详细信息
+            search_results = results.get("search_results", [])
+            detailed_books = results.get("detailed_books", {})
+
+            # 构建 Nodes 对象
+            nodes = []
+            for book in search_results:
+                book_id = book.get("id")
+                detail = detailed_books.get(book_id, {}).get("book", {})
+
+                # 构建电子书信息内容
+                chain = [
+                    Plain(f"书名: {book.get('title', '未知')}\n"),
+                    Plain(f"作者: {book.get('author', '未知')}\n"),
+                    Plain(f"年份: {detail.get('year', '未知')}\n"),
+                    Plain(f"出版社: {detail.get('publisher', '未知')}\n"),
+                    Plain(f"语言: {detail.get('language', '未知')}\n"),
+                    Plain(f"文件大小: {detail.get('filesize', '未知')}\n"),
+                    Plain(f"文件类型: {detail.get('extension', '未知')}\n"),
+                    Plain(f"ID(用于下载): {book_id}"),
+                ]
+
+                node = Node(
+                    uin=event.get_self_id(),
+                    name="Liber3",
+                    content=chain
+                )
+                nodes.append(node)
+            return nodes
+
+        except Exception as e:
+            logger.error(f"[Liber3] 搜索失败: {e}")
+            return "[Liber3] 发生错误，请稍后再试。"
+
+    def _is_valid_liber3_book_id(self, book_id: str) -> bool:
         """检测 Liber3 的 book_id 是否有效"""
         if not book_id:
             return False  # 不能为空
@@ -515,69 +582,32 @@ class ebooks(Star):
 
     @liber3.command("search")
     async def search_liber3(self, event: AstrMessageEvent, query: str = None, limit: str="20"):
-        """搜索电子书并输出详细信息"""
-        if not self.config.get("enable_liber3", False):
-            yield event.plain_result("[Liber3] 功能未启用。")
-            return
+        """搜索 Liber3 电子书"""
+        result = await self._search_liber3_nodes(event, query, limit)
 
-        if not query:
-            yield event.plain_result("[Liber3] 请提供电子书关键词以进行搜索。")
-            return
-
-        limit = int(limit) if limit.isdigit() else 20
-        if not (1 <= limit <= 50):  # Validate limit
-            yield event.plain_result("[Liber3] 请确认搜索返回结果数量在 1-50 之间。")
-            return
-
-        logger.info(f"[Liber3] Received books search query: {query}, limit: {limit}")
-        results = await self.search_liber3_books_with_details(query, limit)
-
-        if not results:
-            yield event.plain_result("[Liber3] 未找到匹配的电子书。")
-            return
-
-        # 输出搜索结果和详细信息
-        search_results = results.get("search_results", [])
-        detailed_books = results.get("detailed_books", {})
-
-        ns = Nodes([])
-
-        for book in search_results:
-            book_id = book.get("id")
-            detail = detailed_books.get(book_id, {}).get("book", {})
-
-            chain = [
-                Plain(f"书名: {book.get('title', '未知')}\n"),
-                Plain(f"作者: {book.get('author', '未知')}\n"),
-                Plain(f"年份: {detail.get('year', '未知')}\n"),
-                Plain(f"出版社: {detail.get('publisher', '未知')}\n"),
-                Plain(f"语言: {detail.get('language', '未知')}\n"),
-                Plain(f"文件大小: {detail.get('filesize', '未知')}\n"),
-                Plain(f"文件类型: {detail.get('extension', '未知')}\n"),
-                Plain(f"ID(用于下载): {book_id}"),
-            ]
-
-            node = Node(
-                uin=event.get_self_id(),
-                name="Liber3",
-                content=chain
-            )
-            ns.nodes.append(node)
-
-        yield event.chain_result([ns])
+        # 根据返回值类型处理结果
+        if isinstance(result, str):
+            yield event.plain_result(result)
+        elif isinstance(result, list):
+            ns = Nodes(result)
+            yield event.chain_result([ns])
+        else:
+            raise ValueError("Unknown result type.")
 
     @liber3.command("download")
     async def download_liber3(self, event: AstrMessageEvent, book_id: str = None):
+        """下载 liber3 电子书"""
+
         if not self.config.get("enable_liber3", False):
             yield event.plain_result("[Liber3] 功能未启用。")
             return
 
-        if not self.is_valid_liber3_book_id(book_id):
+        if not self._is_valid_liber3_book_id(book_id):
             yield event.plain_result("[Liber3] 请提供有效的电子书 ID。")
             return
 
         # 获取详细的电子书信息
-        book_details = await self.get_liber3_book_details([book_id])
+        book_details = await self._get_liber3_book_details([book_id])
         if not book_details or book_id not in book_details:
             yield event.plain_result("[Liber3] 无法获取电子书元信息，请检查电子书 ID 是否正确。")
             return
@@ -750,7 +780,7 @@ class ebooks(Star):
         soup = BeautifulSoup(html_content, "html.parser")
         return soup.get_text().strip()
 
-    def is_valid_archive_book_url(self, book_url: str) -> bool:
+    def _is_valid_archive_book_url(self, book_url: str) -> bool:
         """检测 archive.org 下载链接格式是否合法"""
         if not book_url:
             return False  # URL 不能为空
@@ -762,48 +792,32 @@ class ebooks(Star):
 
         return bool(pattern.match(book_url))
 
-    @command_group("archive")
-    def archive(self):
-        pass
-
-    @archive.command("search")
-    async def search_archive(self, event: AstrMessageEvent, query: str = None, limit: str = "20"):
-        """
-            Search for eBooks using the Archive platform, filtering for supported formats.
-            Args:
-                query (str): The book title or keywords to search for (required).
-                limit (str): The result limit, default is 20.
-        """
+    async def _search_archive_nodes(self, event: AstrMessageEvent, query: str = None, limit: str = "20"):
         if not self.config.get("enable_archive", False):
-            yield event.plain_result("[Archive] 功能未启用。")
-            return
+            return "[Archive] 功能未启用。"
 
-        if not await self.is_url_accessible("https://archive.org"):
-            yield event.plain_result("[Archive] 无法连接到 Archive.org。")
-            return
+        if not await self._is_url_accessible("https://archive.org"):
+            return "[Archive] 无法连接到 Archive.org。"
 
         if not query:
-            yield event.plain_result("[Archive] 请提供电子书关键词以进行搜索。")
-            return
-        
+            return "[Archive] 请提供电子书关键词以进行搜索。"
+
         limit = int(limit) if limit.isdigit() else 20
         if not (1 <= limit <= 50):  # Validate limit
-            yield event.plain_result("[Archive] 请确认搜索返回结果数量在 1-50 之间。")
-            return
+            return "[Archive] 请确认搜索返回结果数量在 1-50 之间。"
         try:
             logger.info(f"[Archive] Received books search query: {query}, limit: {limit}")
             results = await self._search_archive_books(query, limit)
 
             if not results:
-                yield event.plain_result("[Archive] 未找到匹配的电子书。")
-                return
+                return "[Archive] 未找到匹配的电子书。"
 
             # 返回结果到用户
-            ns = Nodes([])
+            nodes = []
             for book in results:
                 chain = [Plain(f"{book.get('title', '未知')}")]
-                if book.get("cover") and await self.is_url_accessible(book.get("cover")):
-                    base64_image = await self.download_and_convert_to_base64(book.get("cover"))
+                if book.get("cover") and await self._is_url_accessible(book.get("cover")):
+                    base64_image = await self._download_and_convert_to_base64(book.get("cover"))
                     if base64_image:
                         chain.append(Image.fromBase64(base64_image))
                     else:
@@ -818,29 +832,42 @@ class ebooks(Star):
                 chain.append(Plain(f"链接(用于下载): {book.get('download_url', '未知')}"))
 
                 node = Node(uin=event.get_self_id(), name="Archive", content=chain)
-                ns.nodes.append(node)
-
-            yield event.chain_result([ns])
-
+                nodes.append(node)
+            return nodes
         except Exception as e:
             logger.error(f"[Archive] Error processing Archive search request: {e}")
-            yield event.plain_result("[Archive] 搜索电子书时发生错误，请稍后再试。")
+            return "[Archive] 搜索电子书时发生错误，请稍后再试。"
+
+    @command_group("archive")
+    def archive(self):
+        pass
+
+    @archive.command("search")
+    async def search_archive(self, event: AstrMessageEvent, query: str = None, limit: str = "20"):
+        """搜索 Archive.org 电子书"""
+        result = await self._search_archive_nodes(event, query, limit)
+
+        # 根据返回值类型处理结果
+        if isinstance(result, str):
+            yield event.plain_result(result)
+        elif isinstance(result, list):
+            ns = Nodes(result)
+            yield event.chain_result([ns])
+        else:
+            raise ValueError("Unknown result type.")
 
     @archive.command("download")
     async def download_archive(self, event: AstrMessageEvent, book_url: str = None):
-        """Download an eBook from the Archive platform using a provided link.
-            Args:
-                book_url (str): The download URL of the eBook.
-        """
+        """下载 Archive.org 电子书"""
         if not self.config.get("enable_archive", False):
             yield event.plain_result("[Archive] 功能未启用。")
             return
 
-        if not await self.is_url_accessible("https://archive.org"):
+        if not await self._is_url_accessible("https://archive.org"):
             yield event.plain_result("[Archive] 无法连接到 Archive.org")
             return
 
-        if not self.is_valid_archive_book_url(book_url):
+        if not self._is_valid_archive_book_url(book_url):
             yield event.plain_result("[Archive] 请提供有效的下载链接。")
             return
 
@@ -920,44 +947,21 @@ class ebooks(Star):
         async for result in self.download_archive(event, download_url):
             yield result
 
-    def is_valid_zlib_book_id(self, book_id: str) -> bool:
-        """检测 zlib ID 是否为纯数字"""
-        if not book_id:
-            return False
-        return book_id.isdigit()
-
-    def is_valid_zlib_book_hash(self, hash: str) -> bool:
-        """检测 zlib Hash 是否为 6 位十六进制"""
-        if not hash:
-            return False
-        pattern = re.compile(r'^[a-f0-9]{6}$', re.IGNORECASE)  # 忽略大小写
-        return bool(pattern.match(hash))
-
-    @command_group("zlib")
-    def zlib(self):
-        pass
-
-    @zlib.command("search")
-    async def search_zlib(self, event: AstrMessageEvent, query: str = None, limit: str = "20"):
-        """搜索 Zlibrary 电子书并输出详细信息"""
+    async def _search_zlib_nodes(self,event: AstrMessageEvent, query: str, limit: str = "20"):
         if not self.config.get("enable_zlib", False):
-            yield event.plain_result("[Z-Library] 功能未启用。")
-            return
+            return "[Z-Library] 功能未启用。"
 
-        if not await self.is_url_accessible("https://z-library.sk"):
-            yield event.plain_result("[Z-Library] 无法连接到 Z-Library。")
-            return
+        if not await self._is_url_accessible("https://z-library.sk"):
+            return "[Z-Library] 无法连接到 Z-Library。"
 
         if not query:
-            yield event.plain_result("[Z-Library] 请提供电子书关键词以进行搜索。")
-            return
+            return "[Z-Library] 请提供电子书关键词以进行搜索。"
+
+        limit = int(limit) if limit.isdigit() else 20
+        if not (1 <= limit <= 50):  # Validate limit
+            return "[Z-Library] 请确认搜索返回结果数量在 1-50 之间。"
 
         try:
-            limit = int(limit) if limit.isdigit() else 20
-            if not (1 <= limit <= 50):  # Validate limit
-                yield event.plain_result("[Z-Library] 请确认搜索返回结果数量在 1-50 之间。")
-                return
-
             logger.info(f"[Z-Library] Received books search query: {query}, limit: {limit}")
 
             if not self.zlibrary:
@@ -967,17 +971,16 @@ class ebooks(Star):
             results = self.zlibrary.search(message=query, limit=limit)
 
             if not results or not results.get("books"):
-                yield event.plain_result("[Z-Library] 未找到匹配的电子书。")
-                return
+                return "[Z-Library] 未找到匹配的电子书。"
 
             # 处理搜索结果
             books = results.get("books", [])
-            ns = Nodes([])
+            nodes = []
 
             for book in books:
                 chain = [Plain(f"{book.get('title', '未知')}")]
-                if book.get("cover") and await self.is_url_accessible(book.get("cover")):
-                    base64_image = await self.download_and_convert_to_base64(book.get("cover"))
+                if book.get("cover") and await self._is_url_accessible(book.get("cover")):
+                    base64_image = await self._download_and_convert_to_base64(book.get("cover"))
                     if base64_image:
                         chain.append(Image.fromBase64(base64_image))
                     else:
@@ -1006,13 +1009,43 @@ class ebooks(Star):
                     name="Z-Library",
                     content=chain,
                 )
-                ns.nodes.append(node)
-
-            yield event.chain_result([ns])
+                nodes.append(node)
+            return nodes
 
         except Exception as e:
             logger.error(f"[Z-Library] Error during book search: {e}")
-            yield event.plain_result("[Z-Library] 搜索电子书时发生错误，请稍后再试。")
+            return "[Z-Library] 搜索电子书时发生错误，请稍后再试。"
+
+    def _is_valid_zlib_book_id(self, book_id: str) -> bool:
+        """检测 zlib ID 是否为纯数字"""
+        if not book_id:
+            return False
+        return book_id.isdigit()
+
+    def _is_valid_zlib_book_hash(self, hash: str) -> bool:
+        """检测 zlib Hash 是否为 6 位十六进制"""
+        if not hash:
+            return False
+        pattern = re.compile(r'^[a-f0-9]{6}$', re.IGNORECASE)  # 忽略大小写
+        return bool(pattern.match(hash))
+
+    @command_group("zlib")
+    def zlib(self):
+        pass
+
+    @zlib.command("search")
+    async def search_zlib(self, event: AstrMessageEvent, query: str = None, limit: str = "20"):
+        """搜索 Zlibrary 电子书"""
+        result = await self._search_zlib_nodes(event, query, limit)
+
+        # 根据返回值类型处理结果
+        if isinstance(result, str):
+            yield event.plain_result(result)
+        elif isinstance(result, list):
+            ns = Nodes(result)
+            yield event.chain_result([ns])
+        else:
+            raise ValueError("Unknown result type.")
 
     @zlib.command("download")
     async def download_zlib(self, event: AstrMessageEvent, book_id: str = None, book_hash: str = None):
@@ -1021,11 +1054,11 @@ class ebooks(Star):
             yield event.plain_result("[Z-Library] 功能未启用。")
             return
 
-        if not await self.is_url_accessible("https://z-library.sk"):
+        if not await self._is_url_accessible("https://z-library.sk"):
             yield event.plain_result("[Z-Library] 无法连接到 Z-Library。")
             return
 
-        if not self.is_valid_zlib_book_id(book_id) or not self.is_valid_zlib_book_hash(book_hash):
+        if not self._is_valid_zlib_book_id(book_id) or not self._is_valid_zlib_book_hash(book_hash):
             yield event.plain_result("[Z-Library] 请使用 /zlib download <id> <hash> 下载。")
             return
 
@@ -1156,32 +1189,36 @@ class ebooks(Star):
             yield event.plain_result("[ebooks] 请确认搜索返回结果数量在 1-50 之间。")
             return
 
-        async def consume_generator_async(gen):
-            """将异步生成器转化为标准协程并返回结果，以确保类型正确"""
-            return [item async for item in gen]
+        async def consume_async(coro_or_gen):
+            """兼容协程或异步生成器"""
+            if hasattr(coro_or_gen, "__aiter__"):  # 如果是异步生成器
+                return [item async for item in coro_or_gen]
+            # 普通协程直接返回
+            return await coro_or_gen
 
         tasks = []
         if self.config.get("enable_calibre", False):
-            tasks.append(consume_generator_async(self.search_calibre(event, query, limit)))
+            tasks.append(consume_async(self._search_calibre_nodes(event, query, limit)))
         if self.config.get("enable_liber3", False):
-            tasks.append(consume_generator_async(self.search_liber3(event, query, limit)))
+            tasks.append(consume_async(self._search_liber3_nodes(event, query, limit)))
         if self.config.get("enable_archive", False):
-            tasks.append(consume_generator_async(self.search_archive(event, query, limit)))
+            tasks.append(consume_async(self._search_archive_nodes(event, query, limit)))
         if self.config.get("enable_zlib", False):
-            tasks.append(consume_generator_async(self.search_zlib(event, query, limit)))
+            tasks.append(consume_async(self._search_zlib_nodes(event, query, limit)))
 
         try:
             # 并发运行所有任务
             search_results = await asyncio.gather(*tasks)
-
             # 将任务结果逐一发送
+            ns = Nodes([])
             for platform_results in search_results:  # 遍历每个平台结果
-                for result in platform_results:  # 遍历具体某个平台的单个结果
-                    try:
-                        yield result
-                    except Exception as e:
-                        logger.error(f"[ebooks] 处理结果时出现异常: {e}")
-                        continue
+                node = Node(
+                    uin=event.get_self_id(),
+                    name="ebooks",
+                    content=platform_results,
+                )
+                ns.nodes.append(node)
+            yield event.chain_result([ns])
 
         except Exception as e:
             logger.error(f"[ebooks] Error during multi-platform search: {e}")
@@ -1276,24 +1313,3 @@ class ebooks(Star):
         """
         async for result in self.download_all_platforms(event, arg1, arg2):
             yield result
-
-    @command("test")
-    async def test(self, event: AstrMessageEvent):
-        yield event.chain_result([Image.fromURL("https://archive.org/services/img/6c-506a-9e-69065a-3c-4f-57c-99d-264e-801b", use_proxy=True)])
-        ns = Nodes([])
-        n_in = Node(
-            uin=event.get_self_id(),
-            name="test",
-            content="test",
-        )
-        n_out = Node(
-            uin=event.get_self_id(),
-            name="test",
-            content=n_in,
-        )
-        ns.nodes.append(n_out)
-        ns.nodes.append(n_out)
-
-        yield event.chain_result([ns])
-
-

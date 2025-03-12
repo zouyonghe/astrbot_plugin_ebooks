@@ -39,10 +39,10 @@ class ebooks(Star):
         try:
             async with aiohttp.ClientSession() as session:
                 if proxy:
-                    async with session.head(url, timeout=10, proxy=self.proxy, allow_redirects=True) as response:
+                    async with session.head(url, timeout=3, proxy=self.proxy, allow_redirects=True) as response:
                         return response.status == 200
                 else:
-                    async with session.head(url, timeout=10, allow_redirects=True) as response:
+                    async with session.head(url, timeout=3, allow_redirects=True) as response:
                         return response.status == 200
         except:
             return False  # 如果请求失败（超时、连接中断等）则返回 False
@@ -1219,8 +1219,6 @@ class ebooks(Star):
                     content=platform_results,
                 )
                 ns.nodes.append(node)
-                ns_test = Nodes(platform_results)
-                yield event.chain_result([ns_test])
             yield event.chain_result([ns])
 
         except Exception as e:

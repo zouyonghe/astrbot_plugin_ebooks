@@ -18,7 +18,7 @@ from astrbot.api.all import *
 from astrbot.api.event.filter import *
 
 
-@register("ebooks", "buding", "一个功能强大的电子书搜索和下载插件", "1.0.3", "https://github.com/zouyonghe/astrbot_plugin_ebooks")
+@register("ebooks", "buding", "一个功能强大的电子书搜索和下载插件", "1.0.4", "https://github.com/zouyonghe/astrbot_plugin_ebooks")
 class ebooks(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
         super().__init__(context)
@@ -26,7 +26,7 @@ class ebooks(Star):
         self.proxy = os.environ.get("https_proxy")
         self.TEMP_PATH = os.path.abspath("data/temp")
         os.makedirs(self.TEMP_PATH, exist_ok=True)
-        self.zlibrary = None
+        self.zlibrary = Zlibrary(email=self.config["zlib_email"], password=self.config["zlib_password"])
 
     async def _is_url_accessible(self, url: str, proxy: bool=True) -> bool:
         """
@@ -39,10 +39,10 @@ class ebooks(Star):
         try:
             async with aiohttp.ClientSession() as session:
                 if proxy:
-                    async with session.head(url, timeout=3, proxy=self.proxy, allow_redirects=True) as response:
+                    async with session.head(url, timeout=5, proxy=self.proxy, allow_redirects=True) as response:
                         return response.status == 200
                 else:
-                    async with session.head(url, timeout=3, allow_redirects=True) as response:
+                    async with session.head(url, timeout=5, allow_redirects=True) as response:
                         return response.status == 200
         except:
             return False  # 如果请求失败（超时、连接中断等）则返回 False
@@ -271,8 +271,8 @@ class ebooks(Star):
             return "[Calibre-Web] 请提供电子书关键词以进行搜索。"
 
         limit = int(limit) if limit.isdigit() else 20
-        if not (1 <= limit <= 50):  # Validate limit
-            return "[Calibre-Web] 请确认搜索返回结果数量在 1-50 之间。"
+        if not (1 <= limit <= 100):  # Validate limit
+            return "[Calibre-Web] 请确认搜索返回结果数量在 1-100 之间。"
 
         try:
             logger.info(f"[Calibre-Web] Received books search query: {query}, limit: {limit}")
@@ -311,8 +311,20 @@ class ebooks(Star):
         if isinstance(result, str):
             yield event.plain_result(result)
         elif isinstance(result, list):
-            ns = Nodes(result)
-            yield event.chain_result([ns])
+            if len(result) <= 30:
+                ns = Nodes(result)
+                yield event.chain_result([ns])
+            else:
+                ns = Nodes([])
+                for i in range(0, len(result), 30):  # 每30条数据分割成一个node
+                    chunk_results = result[i:i + 30]
+                    node = Node(
+                        uin=event.get_self_id(),
+                        name="Calibre-Web",
+                        content=chunk_results,
+                    )
+                    ns.nodes.append(node)
+                yield event.chain_result([ns])
         else:
             raise ValueError("Unknown result type.")
 
@@ -524,8 +536,8 @@ class ebooks(Star):
 
         # 校验 limit 参数
         limit = int(limit) if limit.isdigit() else 20
-        if not (1 <= limit <= 50):  # 确保返回的结果数量有效
-            return "[Liber3] 请确认搜索返回结果数量在 1-50 之间。"
+        if not (1 <= limit <= 100):  # 确保返回的结果数量有效
+            return "[Liber3] 请确认搜索返回结果数量在 1-100 之间。"
 
         try:
             # 打印日志
@@ -540,31 +552,6 @@ class ebooks(Star):
             search_results = results.get("search_results", [])
             detailed_books = results.get("detailed_books", {})
 
-            # 构建 Nodes 对象
-            # nodes = []
-            # for book in search_results:
-            #     book_id = book.get("id")
-            #     detail = detailed_books.get(book_id, {}).get("book", {})
-            #
-            #     # 构建电子书信息内容
-            #     chain = [
-            #         Plain(f"书名: {book.get('title', '未知')}\n"),
-            #         Plain(f"作者: {book.get('author', '未知')}\n"),
-            #         Plain(f"年份: {detail.get('year', '未知')}\n"),
-            #         Plain(f"出版社: {detail.get('publisher', '未知')}\n"),
-            #         Plain(f"语言: {detail.get('language', '未知')}\n"),
-            #         Plain(f"文件大小: {detail.get('filesize', '未知')}\n"),
-            #         Plain(f"文件类型: {detail.get('extension', '未知')}\n"),
-            #         Plain(f"ID(用于下载): {book_id}"),
-            #     ]
-            #
-            #     node = Node(
-            #         uin=event.get_self_id(),
-            #         name="Liber3",
-            #         content=chain
-            #     )
-            #     nodes.append(node)
-            # return nodes
             async def construct_node(book):
                 """异步构造单个节点"""
                 book_id = book.get("id")
@@ -616,8 +603,20 @@ class ebooks(Star):
         if isinstance(result, str):
             yield event.plain_result(result)
         elif isinstance(result, list):
-            ns = Nodes(result)
-            yield event.chain_result([ns])
+            if len(result) <= 30:
+                ns = Nodes(result)
+                yield event.chain_result([ns])
+            else:
+                ns = Nodes([])
+                for i in range(0, len(result), 30):  # 每30条数据分割成一个node
+                    chunk_results = result[i:i + 30]
+                    node = Node(
+                        uin=event.get_self_id(),
+                        name="Liber3",
+                        content=chunk_results,
+                    )
+                    ns.nodes.append(node)
+                yield event.chain_result([ns])
         else:
             raise ValueError("Unknown result type.")
 
@@ -830,8 +829,11 @@ class ebooks(Star):
             return "[Archive] 无法连接到 Archive.org。"
 
         limit = int(limit) if limit.isdigit() else 20
-        if not (1 <= limit <= 50):  # Validate limit
-            return "[Archive] 请确认搜索返回结果数量在 1-50 之间。"
+        if limit < 1:
+            return "[Archive] 请确认搜索返回结果数量在 1-60 之间。"
+        if limit > 60:
+            limit = 60
+
         try:
             logger.info(f"[Archive] Received books search query: {query}, limit: {limit}")
             results = await self._search_archive_books(query, limit)
@@ -862,7 +864,11 @@ class ebooks(Star):
                 chain.append(Plain(f"链接(用于下载): {book.get('download_url', '未知')}"))
 
                 # 构造 Node
-                return Node(uin=event.get_self_id(), name="Archive", content=chain)
+                return Node(
+                    uin=event.get_self_id(),
+                    name="Archive",
+                    content=chain
+                )
             tasks = [construct_node(book) for book in results]
             return await asyncio.gather(*tasks)  # 并发执行所有任务
 
@@ -884,8 +890,20 @@ class ebooks(Star):
         if isinstance(result, str):
             yield event.plain_result(result)
         elif isinstance(result, list):
-            ns = Nodes(result)
-            yield event.chain_result([ns])
+            if len(result) <= 30:
+                ns = Nodes(result)
+                yield event.chain_result([ns])
+            else:
+                ns = Nodes([])
+                for i in range(0, len(result), 30):  # 每30条数据分割成一个node
+                    chunk_results = result[i:i + 30]
+                    node = Node(
+                        uin=event.get_self_id(),
+                        name="Archive",
+                        content=chunk_results,
+                    )
+                    ns.nodes.append(node)
+                yield event.chain_result([ns])
         else:
             raise ValueError("Unknown result type.")
 
@@ -991,14 +1009,15 @@ class ebooks(Star):
             return "[Z-Library] 请提供电子书关键词以进行搜索。"
 
         limit = int(limit) if limit.isdigit() else 20
-        if not (1 <= limit <= 50):  # Validate limit
-            return "[Z-Library] 请确认搜索返回结果数量在 1-50 之间。"
+        if limit < 1:
+            return "[Z-Library] 请确认搜索返回结果数量在 1-60 之间。"
+        if limit > 60:
+            limit = 60
 
         try:
             logger.info(f"[Z-Library] Received books search query: {query}, limit: {limit}")
 
-            if not self.zlibrary:
-                self.zlibrary = Zlibrary(email=self.config["zlib_email"], password=self.config["zlib_password"])
+            self.zlibrary.login(email=self.config["zlib_email"], password=self.config["zlib_password"])
 
             # 调用 Zlibrary 的 search 方法进行搜索
             results = self.zlibrary.search(message=query, limit=limit)
@@ -1086,8 +1105,20 @@ class ebooks(Star):
         if isinstance(result, str):
             yield event.plain_result(result)
         elif isinstance(result, list):
-            ns = Nodes(result)
-            yield event.chain_result([ns])
+            if len(result) <= 30:
+                ns = Nodes(result)
+                yield event.chain_result([ns])
+            else:
+                ns = Nodes([])
+                for i in range(0, len(result), 30):  # 每30条数据分割成一个node
+                    chunk_results = result[i:i + 30]
+                    node = Node(
+                        uin=event.get_self_id(),
+                        name="Z-Library",
+                        content=chunk_results,
+                    )
+                    ns.nodes.append(node)
+                yield event.chain_result([ns])
         else:
             raise ValueError("Unknown result type.")
 
@@ -1098,17 +1129,16 @@ class ebooks(Star):
             yield event.plain_result("[Z-Library] 功能未启用。")
             return
 
-        if not await self._is_url_accessible("https://z-library.sk"):
-            yield event.plain_result("[Z-Library] 无法连接到 Z-Library。")
-            return
-
         if not self._is_valid_zlib_book_id(book_id) or not self._is_valid_zlib_book_hash(book_hash):
             yield event.plain_result("[Z-Library] 请使用 /zlib download <id> <hash> 下载。")
             return
 
+        if not await self._is_url_accessible("https://z-library.sk"):
+            yield event.plain_result("[Z-Library] 无法连接到 Z-Library。")
+            return
+
         try:
-            if not self.zlibrary:
-                self.zlibrary = Zlibrary(email=self.config["zlib_email"], password=self.config["zlib_password"])
+            self.zlibrary.login(email=self.config["zlib_email"], password=self.config["zlib_password"])
 
             # 获取电子书详情，确保 ID 合法
             book_details = self.zlibrary.getBookInfo(book_id, hashid=book_hash)
@@ -1229,8 +1259,8 @@ class ebooks(Star):
             yield event.plain_result("[ebooks] 请提供电子书关键词以进行搜索。")
             return
 
-        if not (1 <= int(limit) <= 50):  # Validate limit
-            yield event.plain_result("[ebooks] 请确认搜索返回结果数量在 1-50 之间。")
+        if not (1 <= int(limit) <= 100):  # Validate limit
+            yield event.plain_result("[ebooks] 请确认搜索返回结果数量在 1-100 之间。")
             return
 
         async def consume_async(coro_or_gen):
@@ -1257,12 +1287,23 @@ class ebooks(Star):
             ns = Nodes([])
 
             for platform_results in search_results:  # 遍历每个平台结果
-                node = Node(
-                    uin=event.get_self_id(),
-                    name="ebooks",
-                    content=platform_results,
-                )
-                ns.nodes.append(node)
+                if isinstance(platform_results, str):
+                    node = Node(
+                        uin=event.get_self_id(),
+                        name=platform_results,
+                        content=platform_results,
+                    )
+                    ns.nodes.append(node)
+                    continue
+                for i in range(0, len(platform_results), 30):  # 每30条数据分割成一个node
+                    # 创建新的 node 包含不超过 20 条结果
+                    chunk_results = platform_results[i:i + 30]
+                    node = Node(
+                        uin=event.get_self_id(),
+                        name="ebooks",
+                        content=chunk_results,
+                    )
+                    ns.nodes.append(node)
             yield event.chain_result([ns])
 
         except Exception as e:
@@ -1358,3 +1399,5 @@ class ebooks(Star):
         """
         async for result in self.download_all_platforms(event, arg1, arg2):
             yield result
+
+

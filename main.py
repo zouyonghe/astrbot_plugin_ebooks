@@ -1290,7 +1290,7 @@ class ebooks(Star):
                 if isinstance(platform_results, str):
                     node = Node(
                         uin=event.get_self_id(),
-                        name=platform_results,
+                        name="ebooks",
                         content=platform_results,
                     )
                     ns.nodes.append(node)

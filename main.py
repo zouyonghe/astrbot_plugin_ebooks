@@ -18,7 +18,7 @@ from astrbot.api.all import *
 from astrbot.api.event.filter import *
 
 
-@register("ebooks", "buding", "一个功能强大的电子书搜索和下载插件", "1.0.4", "https://github.com/zouyonghe/astrbot_plugin_ebooks")
+@register("ebooks", "buding", "一个功能强大的电子书搜索和下载插件", "1.0.5", "https://github.com/zouyonghe/astrbot_plugin_ebooks")
 class ebooks(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
         super().__init__(context)
@@ -26,7 +26,17 @@ class ebooks(Star):
         self.proxy = os.environ.get("https_proxy")
         self.TEMP_PATH = os.path.abspath("data/temp")
         os.makedirs(self.TEMP_PATH, exist_ok=True)
-        self.zlibrary = Zlibrary(email=self.config["zlib_email"], password=self.config["zlib_password"])
+        if not self.config.get("calibre_web_url", "http://127.0.0.1:8083").strip():
+            self.config["enable_calibre"] = False
+            self.config.save_config()
+            logger.info("[ebooks] 未设置 Calibre-Web URL，禁用该平台。")
+        if self.config.get("zlib_email", "").strip() and self.config.get("zlib_password","").strip():
+            self.zlibrary = Zlibrary(email=self.config["zlib_email"].strip(), password=self.config["zlib_password"].strip())
+        else:
+            self.zlibrary = Zlibrary()
+            self.config["enable_zlib"] = False
+            self.config.save_config()
+            logger.info("[ebooks] 未设置 Z-Library 账户，禁用该平台。")
 
     async def _is_url_accessible(self, url: str, proxy: bool=True) -> bool:
         """

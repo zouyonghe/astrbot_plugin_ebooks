@@ -32,11 +32,13 @@
     "zlib_email": {
         "type": "string",
         "description": "Z-Library 登录邮箱",
+        "default": "",
         "hint": "登录 Z-Library 的邮箱"
     },
     "zlib_password": {
         "type": "string",
         "description": "Z-Library 登录密码",
+        "default": "",
         "hint": "登录 Z-Library 的密码"
     }
 }

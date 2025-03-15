@@ -43,10 +43,13 @@ class ebooks(Star):
             password = self.config.get("zlib_password", "").strip()
 
             if email and password:
-                self.zlibrary = Zlibrary(email=email, password=password)
-                if self.zlibrary.isLoggedIn():
-                    logger.info("[ebooks] 已登录 Z-Library。")
-                else:
+                try:
+                    self.zlibrary = Zlibrary(email=email, password=password)
+                    if self.zlibrary.isLoggedIn():
+                        logger.info("[ebooks] 已登录 Z-Library。")
+                    else:
+                        self._disable_zlib("登录 Z-Library 失败，禁用该平台。")
+                except:
                     self._disable_zlib("登录 Z-Library 失败，禁用该平台。")
             else:
                 self._disable_zlib("未设置 Z-Library 账户，禁用该平台。")

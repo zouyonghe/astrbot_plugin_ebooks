@@ -23,6 +23,12 @@
         "default": false,
         "hint": "若启用需要配置 Z-Library 的登录账户"
     },
+    "enable_annas": {
+        "type": "bool",
+        "description": "启用 Anna's Archive 电子书搜索",
+        "default": false,
+        "hint": "此搜索方式暂不支持直接下载，只能获得下载链接。"
+    },
     "calibre_web_url": {
         "type": "string",
         "description": "calibre-web 地址",

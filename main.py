@@ -13,12 +13,15 @@ import aiohttp
 from aiohttp import ClientPayloadError
 from bs4 import BeautifulSoup
 
+from annas_py.models.args import Language
 from data.plugins.astrbot_plugin_ebooks.Zlibrary import Zlibrary
+from data.plugins.astrbot_plugin_ebooks.annas_py import search as annas_search
+from data.plugins.astrbot_plugin_ebooks.annas_py import get_information as get_annas_information
 from astrbot.api.all import *
 from astrbot.api.event.filter import *
 
 
-@register("ebooks", "buding", "一个功能强大的电子书搜索和下载插件", "1.0.6", "https://github.com/zouyonghe/astrbot_plugin_ebooks")
+@register("ebooks", "buding", "一个功能强大的电子书搜索和下载插件", "1.0.7", "https://github.com/zouyonghe/astrbot_plugin_ebooks")
 class ebooks(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
         super().__init__(context)
@@ -34,6 +37,7 @@ class ebooks(Star):
             logger.info("[ebooks] 未设置 Calibre-Web URL，禁用该平台。")
 
         # 初始化 Z-Library 配置
+        self.zlibrary = Zlibrary()
         if self.config.get("enable_zlib", False):
             email = self.config.get("zlib_email", "").strip()
             password = self.config.get("zlib_password", "").strip()
@@ -597,7 +601,7 @@ class ebooks(Star):
                     Plain(f"语言: {detail.get('language', '未知')}\n"),
                     Plain(f"文件大小: {detail.get('filesize', '未知')}\n"),
                     Plain(f"文件类型: {detail.get('extension', '未知')}\n"),
-                    Plain(f"ID(用于下载): {book_id}"),
+                    Plain(f"ID(用于下载): L{book_id}"),
                 ]
 
                 # 构造节点
@@ -617,8 +621,8 @@ class ebooks(Star):
         if not book_id:
             return False  # 不能为空
 
-        # 使用正则表达式验证是否是 32 位大写十六进制字符串
-        pattern = re.compile(r'^[a-fA-F0-9]{32}$')
+        # 使用正则表达式验证是否是以 L 开头后接 32 位十六进制字符串
+        pattern = re.compile(r'^L[a-fA-F0-9]{32}$')
         return bool(pattern.match(book_id))
 
     @command_group("liber3")
@@ -662,6 +666,8 @@ class ebooks(Star):
         if not self._is_valid_liber3_book_id(book_id):
             yield event.plain_result("[Liber3] 请提供有效的电子书 ID。")
             return
+
+        book_id = book_id.lstrip("L")
 
         # 获取详细的电子书信息
         book_details = await self._get_liber3_book_details([book_id])
@@ -714,7 +720,7 @@ class ebooks(Star):
 
 
     async def _search_archive_books(self, query: str, limit: int = 20):
-        """Search for eBooks through the Archive API and filter files in PDF or EPUB formats.
+        """Search for eBooks through the archive.org API and filter files in PDF or EPUB formats.
             Args:
                 query (str): Search keyword for titles
                 limit (int): Maximum number of results to return
@@ -735,17 +741,17 @@ class ebooks(Star):
         }
 
         async with aiohttp.ClientSession() as session:
-            # 1. 调用 Archive 搜索 API
+            # 1. 调用 archive.org 搜索 API
             response = await session.get(base_search_url, params=params, proxy=self.proxy)
             if response.status != 200:
                 logger.error(
-                    f"[Archive] Error during search: Archive API returned status code {response.status}")
+                    f"[archive.org] Error during search: archive.org API returned status code {response.status}")
                 return []
 
             result_data = await response.json()
             docs = result_data.get("response", {}).get("docs", [])
             if not docs:
-                logger.info("[Archive] 未找到匹配的电子书。")
+                logger.info("[archive.org] 未找到匹配的电子书。")
                 return []
 
             # 2. 根据 identifier 提取元数据
@@ -783,7 +789,7 @@ class ebooks(Star):
         try:
             response = await session.get(url, proxy=self.proxy)
             if response.status != 200:
-                logger.error(f"[Archive] Error retrieving Metadata: Status code {response.status}")
+                logger.error(f"[archive.org] Error retrieving Metadata: Status code {response.status}")
                 return {}
 
             book_detail = await response.json()
@@ -823,7 +829,7 @@ class ebooks(Star):
                     }
 
         except Exception as e:
-            logger.error(f"[Archive] 获取 Metadata 数据时发生错误: {e}")
+            logger.error(f"[archive.org] 获取 Metadata 数据时发生错误: {e}")
         return {}
 
     def _is_html(self, content):
@@ -851,26 +857,26 @@ class ebooks(Star):
 
     async def _search_archive_nodes(self, event: AstrMessageEvent, query: str = None, limit: str = "20"):
         if not self.config.get("enable_archive", False):
-            return "[Archive] 功能未启用。"
+            return "[archive.org] 功能未启用。"
 
         if not query:
-            return "[Archive] 请提供电子书关键词以进行搜索。"
+            return "[archive.org] 请提供电子书关键词以进行搜索。"
 
         if not await self._is_url_accessible("https://archive.org"):
-            return "[Archive] 无法连接到 Archive.org。"
+            return "[archive.org] 无法连接到 archive.org。"
 
         limit = int(limit) if limit.isdigit() else 20
         if limit < 1:
-            return "[Archive] 请确认搜索返回结果数量在 1-60 之间。"
+            return "[archive.org] 请确认搜索返回结果数量在 1-60 之间。"
         if limit > 60:
             limit = 60
 
         try:
-            logger.info(f"[Archive] Received books search query: {query}, limit: {limit}")
+            logger.info(f"[archive.org] Received books search query: {query}, limit: {limit}")
             results = await self._search_archive_books(query, limit)
 
             if not results:
-                return "[Archive] 未找到匹配的电子书。"
+                return "[archive.org] 未找到匹配的电子书。"
 
             async def construct_node(book):
                 """异步构造单个节点"""
@@ -897,7 +903,7 @@ class ebooks(Star):
                 # 构造 Node
                 return Node(
                     uin=event.get_self_id(),
-                    name="Archive",
+                    name="archive.org",
                     content=chain
                 )
             tasks = [construct_node(book) for book in results]
@@ -905,8 +911,8 @@ class ebooks(Star):
 
             # return nodes
         except Exception as e:
-            logger.error(f"[Archive] Error processing Archive search request: {e}")
-            return "[Archive] 搜索电子书时发生错误，请稍后再试。"
+            logger.error(f"[archive.org] Error processing archive.org search request: {e}")
+            return "[archive.org] 搜索电子书时发生错误，请稍后再试。"
 
     @command_group("archive")
     def archive(self):
@@ -914,7 +920,7 @@ class ebooks(Star):
 
     @archive.command("search")
     async def search_archive(self, event: AstrMessageEvent, query: str = None, limit: str = "20"):
-        """搜索 Archive.org 电子书"""
+        """搜索 archive.org 电子书"""
         result = await self._search_archive_nodes(event, query, limit)
 
         # 根据返回值类型处理结果
@@ -930,7 +936,7 @@ class ebooks(Star):
                     chunk_results = result[i:i + 30]
                     node = Node(
                         uin=event.get_self_id(),
-                        name="Archive",
+                        name="archive.org",
                         content=chunk_results,
                     )
                     ns.nodes.append(node)
@@ -940,17 +946,17 @@ class ebooks(Star):
 
     @archive.command("download")
     async def download_archive(self, event: AstrMessageEvent, book_url: str = None):
-        """下载 Archive.org 电子书"""
+        """下载 archive.org 电子书"""
         if not self.config.get("enable_archive", False):
-            yield event.plain_result("[Archive] 功能未启用。")
+            yield event.plain_result("[archive.org] 功能未启用。")
             return
 
         if not self._is_valid_archive_book_url(book_url):
-            yield event.plain_result("[Archive] 请提供有效的下载链接。")
+            yield event.plain_result("[archive.org] 请提供有效的下载链接。")
             return
 
         if not await self._is_url_accessible("https://archive.org"):
-            yield event.plain_result("[Archive] 无法连接到 Archive.org")
+            yield event.plain_result("[archive.org] 无法连接到 archive.org")
             return
 
         try:
@@ -959,7 +965,7 @@ class ebooks(Star):
                 async with session.get(book_url, allow_redirects=True, proxy=self.proxy) as response:
                     if response.status == 200:
                         ebook_url = str(response.url)
-                        logger.debug(f"[Archive] 跳转后的下载地址: {ebook_url}")
+                        logger.debug(f"[archive.org] 跳转后的下载地址: {ebook_url}")
 
                         # 从 Content-Disposition 提取文件名
                         content_disposition = response.headers.get("Content-Disposition", "")
@@ -988,7 +994,7 @@ class ebooks(Star):
                             await temp_file.write(await response.read())
 
                         # 打印日志确认保存成功
-                        logger.info(f"[Archive] 文件已下载并保存到临时目录：{temp_file_path}")
+                        logger.info(f"[archive.org] 文件已下载并保存到临时目录：{temp_file_path}")
 
                         # 直接传递本地文件路径
                         file = File(name=book_name, file=temp_file_path)
@@ -998,17 +1004,17 @@ class ebooks(Star):
                         # file = File(name=book_name, file=ebook_url)
                         # yield event.chain_result([file])
                     else:
-                        yield event.plain_result(f"[Archive] 无法下载电子书，状态码: {response.status}")
+                        yield event.plain_result(f"[archive.org] 无法下载电子书，状态码: {response.status}")
         except Exception as e:
-            logger.error(f"[Archive] 下载失败: {e}")
-            yield event.plain_result(f"[Archive] 下载电子书时发生错误，请稍后再试。")
+            logger.error(f"[archive.org] 下载失败: {e}")
+            yield event.plain_result(f"[archive.org] 下载电子书时发生错误，请稍后再试。")
 
     # @llm_tool("search_archive_books")
     async def search_archive_books(self, event: AstrMessageEvent, query: str):
-        """Search for eBooks using the Archive API.
+        """Search for eBooks using the archive.org API.
     
         When to use:
-            Utilize this method to search books available in supported formats (such as PDF or EPUB) on the Archive API platform.
+            Utilize this method to search books available in supported formats (such as PDF or EPUB) on the archive.org API platform.
     
         Args:
             query (string): The keywords or title to perform the search.
@@ -1018,13 +1024,13 @@ class ebooks(Star):
 
     # @llm_tool("download_archive_book")
     async def download_archive_book(self, event: AstrMessageEvent, download_url: str):
-        """Download an eBook from the Archive API using its download URL.
+        """Download an eBook from the archive.org API using its download URL.
     
         When to use:
-            Use this method to download a specific book from the Archive platform using the book's provided download link.
+            Use this method to download a specific book from the archive.org platform using the book's provided download link.
     
         Args:
-            download_url (string): A valid and supported Archive book download URL.
+            download_url (string): A valid and supported archive.org book download URL.
         """
         async for result in self.download_archive(event, download_url):
             yield result
@@ -1231,10 +1237,173 @@ class ebooks(Star):
         """
         async for result in self.download_zlib(event, book_id, book_hash):
             yield result
-    
+
+    async def _search_annas_nodes(self, event: AstrMessageEvent, query: str, limit: str = "20"):
+        if not self.config.get("enable_annas", False):
+            return "[Anna's Archive] 功能未启用。"
+
+        if not await self._is_url_accessible("https://annas-archive.org"):
+            return "[Anna's Archive] 无法连接到 Anna's Archive。"
+
+        if not query:
+            return "[Anna's Archive] 请提供电子书关键词以进行搜索。"
+
+        limit = int(limit) if limit.isdigit() else 20
+        if limit < 1:
+            return "[Anna's Archive] 请确认搜索返回结果数量在 1-60 之间。"
+        if limit > 60:
+            limit = 60
+
+        try:
+            logger.info(f"[Anna's Archive] Received books search query: {query}, limit: {limit}")
+
+            # 调用 annas_search 查询
+            results = annas_search(query, Language.ZH)
+            if not results or len(results) == 0:
+                return "[Anna's Archive] 未找到匹配的电子书。"
+
+            # 处理搜索结果
+            books = results[:limit]  # 截取前 limit 条结果
+
+            async def construct_node(book):
+                """异步构造单个节点"""
+                chain = [Plain(f"{book.title}\n")]
+
+                # 异步处理封面图片
+                if book.thumbnail:
+                    base64_image = await self._download_and_convert_to_base64(book.thumbnail)
+                    if base64_image and self._is_base64_image(base64_image):
+                        chain.append(Image.fromBase64(base64_image))
+                    else:
+                        chain.append(Plain("\n"))
+                else:
+                    chain.append(Plain("\n"))
+
+                # 添加书籍信息
+                chain.append(Plain(f"作者: {book.authors or '未知'}\n"))
+                chain.append(Plain(f"出版社: {book.publisher or '未知'}\n"))
+                chain.append(Plain(f"年份: {book.publish_date or '未知'}\n"))
+
+                # 语言信息
+                language = book.file_info.language if book.file_info else "未知"
+                chain.append(Plain(f"语言: {language}\n"))
+
+                # 附加文件信息
+                extension = book.file_info.extension if book.file_info else "未知"
+                chain.append(Plain(f"格式: {extension}\n"))
+
+                # ID 信息
+                chain.append(Plain(f"ID: A{book.id}\n"))
+
+                # 构造最终节点
+                return Node(
+                    uin=event.get_self_id(),
+                    name="Anna's Archive",
+                    content=chain,
+                )
+
+            # 遍历所有书籍，构造节点任务
+            tasks = [construct_node(book) for book in books]
+            return await asyncio.gather(*tasks)
+
+        except Exception as e:
+            logger.error(f"[Anna's Archive] Error during book search: {e}")
+            return "[Anna's Archive] 搜索电子书时发生错误，请稍后再试。"
+
+    def _is_valid_annas_book_id(self, book_id: str) -> bool:
+        """检测 Liber3 的 book_id 是否有效"""
+        if not book_id:
+            return False  # 不能为空
+
+        # 使用正则表达式验证是否是以 A 开头后接 32 位十六进制字符串
+        pattern = re.compile(r'^A[a-fA-F0-9]{32}$')
+        return bool(pattern.match(book_id))
+
+    @command_group("annas")
+    def annas(self):
+        pass
+
+    @annas.command("search")
+    async def search_annas(self, event: AstrMessageEvent, query: str, limit: str = "20"):
+        """搜索 anna's archive 电子书"""
+        result = await self._search_annas_nodes(event, query, limit)
+
+        # 根据返回值类型处理结果
+        if isinstance(result, str):
+            yield event.plain_result(result)
+        elif isinstance(result, list):
+            if len(result) <= 30:
+                ns = Nodes(result)
+                yield event.chain_result([ns])
+            else:
+                ns = Nodes([])
+                for i in range(0, len(result), 30):  # 每30条数据分割成一个node
+                    chunk_results = result[i:i + 30]
+                    node = Node(
+                        uin=event.get_self_id(),
+                        name="anna's archive",
+                        content=chunk_results,
+                    )
+                    ns.nodes.append(node)
+                yield event.chain_result([ns])
+        else:
+            raise ValueError("Unknown result type.")
+
+    @annas.command("download")
+    async def download_annas(self, event: AstrMessageEvent, book_id: str = None):
+        """从 Anna's Archive 下载电子书"""
+        if not self.config.get("enable_annas", False):
+            yield event.plain_result("[Anna's Archive] 功能未启用。")
+            return
+
+        if not book_id:
+            yield event.plain_result("[Anna's Archive] 请提供有效的书籍 ID。")
+            return
+
+        try:
+            book_id = book_id.lstrip("A")
+            # 获取 Anna's Archive 的书籍信息
+            book_info = get_annas_information(book_id)
+            urls = book_info.urls
+
+            if not urls:
+                yield event.plain_result("[Anna's Archive] 未找到任何下载链接！")
+                return
+
+            chain = [Plain("Anna's Archive\n目前无法直接下载电子书，可以通过访问下列链接手动下载：")]
+
+            # 快速链接（需要付费）
+            fast_links = [url for url in urls if "Fast Partner Server" in url.title]
+            if fast_links:
+                chain.append(Plain("\n快速链接（需要付费）：\n"))
+                for index, url in enumerate(fast_links, 1):
+                    chain.append(Plain(f"{index}. {url.url}\n"))
+
+            # 慢速链接（需要等待）
+            slow_links = [url for url in urls if "Slow Partner Server" in url.title]
+            if slow_links:
+                chain.append(Plain("\n慢速链接（需要等待）：\n"))
+                for index, url in enumerate(slow_links, 1):
+                    chain.append(Plain(f"{index}. {url.url}\n"))
+
+            # 第三方链接
+            other_links = [url for url in urls if
+                           "Fast Partner Server" not in url.title and "Slow Partner Server" not in url.title]
+            if other_links:
+                chain.append(Plain("\n第三方链接：\n"))
+                for index, url in enumerate(other_links, 1):
+                    chain.append(Plain(f"{index}. {url.url}\n"))
+
+            yield event.chain_result([Node(uin=event.get_self_id(), name="Anna's Archive", content=chain)])
+
+        except Exception as e:
+            logger.error(f"[Anna's Archive] 下载失败：{e}")
+            yield event.plain_result(f"[Anna's Archive] 下载电子书时发生错误，请稍后再试：{e}")
+
+
     @command_group("ebooks")
     def ebooks(self):
-        pass
+            pass
     
     @ebooks.command("help")
     async def show_help(self, event: AstrMessageEvent):
@@ -1242,7 +1411,7 @@ class ebooks(Star):
         help_msg = [
             "📚 **ebooks 插件使用指南**",
             "",
-            "支持通过多平台（Calibre-Web、Liber3、Z-Library、Archive.org）搜索、下载电子书。",
+            "支持通过多平台（Calibre-Web、Liber3、Z-Library、archive.org）搜索、下载电子书。",
             "",
             "---",
             "🔧 **命令列表**:",
@@ -1252,9 +1421,9 @@ class ebooks(Star):
             "  - `/calibre download <下载链接/书名>`：通过 Calibre-Web 下载电子书。例如：`/calibre download <URL>`。",
             "  - `/calibre recommend <数量>`：随机推荐指定数量的电子书。",
             "",
-            "- **Archive.org**:",
-            "  - `/archive search <关键词> [数量]`：搜索 Archive.org 电子书。例如：`/archive search Python 20`。",
-            "  - `/archive download <下载链接>`：通过 Archive.org 平台下载电子书。",
+            "- **archive.org**:",
+            "  - `/archive search <关键词> [数量]`：搜索 archive.org 电子书。例如：`/archive search Python 20`。",
+            "  - `/archive download <下载链接>`：通过 archive.org 平台下载电子书。",
             "",
             "- **Z-Library**:",
             "  - `/zlib search <关键词> [数量]`：搜索 Z-Library 的电子书。例如：`/zlib search Python 20`。",
@@ -1264,6 +1433,10 @@ class ebooks(Star):
             "  - `/liber3 search <关键词> [数量]`：搜索 Liber3 平台上的电子书。例如：`/liber3 search Python 20`。",
             "  - `/liber3 download <ID>`：通过 Liber3 平台下载电子书。",
             "",
+            "- **Anna's Archive**:",
+            "  - `/annas search <关键词> [数量]`：搜索 Anna's Archive 平台上的电子书。例如：`/annas search Python 20`。",
+            "  - `/annas download <ID>`：获取 Anna's Archive 电子书下载链接。",
+            "",
             "- **通用命令**:",
             "  - `/ebooks help`：显示当前插件的帮助信息。",
             "  - `/ebooks search <关键词> [数量]`：在所有支持的平台中同时搜索电子书。例如：`/ebooks search Python 20`。",
@@ -1271,16 +1444,17 @@ class ebooks(Star):
             "",
             "---",
             "📒 **注意事项**:",
-            "- `数量` 为可选参数，默认为20，用于限制搜索结果的返回数量，数量过大可能导致构造转发消息失败。",
+            "- `数量` 为可选参数，默认为20，用于限制搜索结果的返回数量，数量超过30会分多个转发发送。",
             "- 下载指令要根据搜索结果，提供有效的 URL、ID 和 Hash 值。",
-            "- 推荐功能会从现有书目中随机选择书籍进行展示。（仅支持Calibre-Web)",
+            "- 推荐功能会从现有书目中随机选择书籍进行展示（目前仅支持Calibre-Web)。",
+            "- 目前无法直接从 Anna's Archive 下载电子书。",
             "",
             "---",
             "🌐 **支持平台**:",
             "- Calibre-Web",
             "- Liber3",
             "- Z-Library",
-            "- Archive.org",
+            "- archive.org",
         ]
         yield event.plain_result("\n".join(help_msg))
 
@@ -1313,6 +1487,8 @@ class ebooks(Star):
             tasks.append(consume_async(self._search_archive_nodes(event, query, limit)))
         if self.config.get("enable_zlib", False):
             tasks.append(consume_async(self._search_zlib_nodes(event, query, limit)))
+        if self.config.get("enable_annas", False):
+            tasks.append(consume_async(self._search_annas_nodes(event, query, limit)))
 
         try:
             # 并发运行所有任务
@@ -1375,17 +1551,24 @@ class ebooks(Star):
                         yield result
                     return
 
-                # Archive.org 下载
+                # archive.org 下载
                 if "archive.org/download/" in arg1:
-                    logger.info("[ebooks] 检测到 Archive.org 链接，开始下载...")
+                    logger.info("[ebooks] 检测到 archive.org 链接，开始下载...")
                     async for result in self.download_archive(event, arg1):
                         yield result
                     return
 
             # Liber3 下载
-            if len(arg1) == 32 and re.match(r"^[A-Fa-f0-9]{32}$", arg1):  # 符合 Liber3 的 ID 格式
+            if len(arg1) == 33 and re.match(r"^L[A-Fa-f0-9]{32}$", arg1):
                 logger.info("[ebooks] ⏳ 检测到 Liber3 ID，开始下载...")
                 async for result in self.download_liber3(event, arg1):
+                    yield result
+                return
+
+            # Annas Archive 下载
+            if len(arg1) == 33 and re.match(r"^A[A-Fa-f0-9]{32}$", arg1):
+                logger.info("[ebooks] ⏳ 检测到 Annas Archive ID，开始下载...")
+                async for result in self.download_annas(event, arg1):
                     yield result
                 return
 
@@ -1393,8 +1576,8 @@ class ebooks(Star):
             yield event.plain_result(
                 "[ebooks] 未识别的输入格式，请提供以下格式之一：\n"
                 "- Calibre-Web 下载链接\n"
-                "- Archive.org 下载链接\n"
-                "- Liber3 32位 ID\n"
+                "- archive.org 下载链接\n"
+                "- Liber3/Annas Archive 32位 ID\n"
                 "- Z-Library 的 ID 和 Hash"
             )
 

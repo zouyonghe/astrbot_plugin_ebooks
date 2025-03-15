@@ -13,7 +13,7 @@ import aiohttp
 from aiohttp import ClientPayloadError
 from bs4 import BeautifulSoup
 
-from annas_py.models.args import Language
+from data.plugins.astrbot_plugin_ebooks.annas_py.models.args import Language
 from data.plugins.astrbot_plugin_ebooks.Zlibrary import Zlibrary
 from data.plugins.astrbot_plugin_ebooks.annas_py import search as annas_search
 from data.plugins.astrbot_plugin_ebooks.annas_py import get_information as get_annas_information

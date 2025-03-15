@@ -18,7 +18,7 @@ from astrbot.api.all import *
 from astrbot.api.event.filter import *
 
 
-@register("ebooks", "buding", "一个功能强大的电子书搜索和下载插件", "1.0.5", "https://github.com/zouyonghe/astrbot_plugin_ebooks")
+@register("ebooks", "buding", "一个功能强大的电子书搜索和下载插件", "1.0.6", "https://github.com/zouyonghe/astrbot_plugin_ebooks")
 class ebooks(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
         super().__init__(context)
@@ -26,17 +26,42 @@ class ebooks(Star):
         self.proxy = os.environ.get("https_proxy")
         self.TEMP_PATH = os.path.abspath("data/temp")
         os.makedirs(self.TEMP_PATH, exist_ok=True)
-        if not self.config.get("calibre_web_url", "http://127.0.0.1:8083").strip():
+
+        # 初始化 Calibre 配置
+        if self.config.get("enable_calibre", False) and not self.config.get("calibre_web_url", "").strip():
             self.config["enable_calibre"] = False
             self.config.save_config()
             logger.info("[ebooks] 未设置 Calibre-Web URL，禁用该平台。")
-        if self.config.get("zlib_email", "").strip() and self.config.get("zlib_password","").strip():
-            self.zlibrary = Zlibrary(email=self.config["zlib_email"].strip(), password=self.config["zlib_password"].strip())
-        else:
-            self.zlibrary = Zlibrary()
-            self.config["enable_zlib"] = False
-            self.config.save_config()
-            logger.info("[ebooks] 未设置 Z-Library 账户，禁用该平台。")
+
+        # 初始化 Z-Library 配置
+        if self.config.get("enable_zlib", False):
+            email = self.config.get("zlib_email", "").strip()
+            password = self.config.get("zlib_password", "").strip()
+
+            if email and password:
+                self.zlibrary = Zlibrary(email=email, password=password)
+                if self.zlibrary.loggedin:
+                    logger.info("[ebooks] 已登录 Z-Library。")
+                else:
+                    self._disable_zlib("登录 Z-Library 失败，禁用该平台。")
+            else:
+                self._disable_zlib("未设置 Z-Library 账户，禁用该平台。")
+
+    def _disable_zlib(self, reason: str):
+        """禁用 Z-Library 平台并保存配置"""
+        self.zlibrary = Zlibrary()
+        self.config["enable_zlib"] = False
+        self.config.save_config()
+        logger.info(f"[ebooks] {reason}")
+
+    async def terminate(self):
+        if self.zlibrary and self.zlibrary.loggedin:
+            try:
+                self.zlibrary.logout()
+            except:
+                logger.info(f"[ebooks] 登出 Z-Library 失败。")
+            self.zlibrary = None
+
 
     async def _is_url_accessible(self, url: str, proxy: bool=True) -> bool:
         """
@@ -1027,7 +1052,8 @@ class ebooks(Star):
         try:
             logger.info(f"[Z-Library] Received books search query: {query}, limit: {limit}")
 
-            self.zlibrary.login(email=self.config["zlib_email"], password=self.config["zlib_password"])
+            if not self.zlibrary.loggedin:
+                return "[Z-Library] 未登录或登录失败。"
 
             # 调用 Zlibrary 的 search 方法进行搜索
             results = self.zlibrary.search(message=query, limit=limit)
@@ -1148,7 +1174,9 @@ class ebooks(Star):
             return
 
         try:
-            self.zlibrary.login(email=self.config["zlib_email"], password=self.config["zlib_password"])
+            if not self.zlibrary.loggedin:
+                yield event.plain_result("[Z-Library] 未登录或登录失败。")
+                return
 
             # 获取电子书详情，确保 ID 合法
             book_details = self.zlibrary.getBookInfo(book_id, hashid=book_hash)

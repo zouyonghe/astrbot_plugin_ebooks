@@ -1296,7 +1296,7 @@ class ebooks(Star):
                 chain.append(Plain(f"格式: {extension}\n"))
 
                 # ID 信息
-                chain.append(Plain(f"ID: A{book.id}\n"))
+                chain.append(Plain(f"ID: A{book.id}"))
 
                 # 构造最终节点
                 return Node(

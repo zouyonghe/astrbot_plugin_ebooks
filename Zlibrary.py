@@ -26,7 +26,7 @@ class Zlibrary:
         self.__remix_userkey: str
         self.__domain = "z-library.sk" #"1lib.sk"
 
-        self.loggedin = False
+        self.__loggedin = False
         self.__headers = {
             "Content-Type": "application/x-www-form-urlencoded",
             "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
@@ -53,7 +53,7 @@ class Zlibrary:
         self.__remix_userkey = response["user"]["remix_userkey"]
         self.__cookies["remix_userid"] = self.__remix_userid
         self.__cookies["remix_userkey"] = self.__remix_userkey
-        self.loggedin = True
+        self.__loggedin = True
         return response
 
     def __login(self, email, password) -> dict[str, str]:
@@ -331,7 +331,7 @@ class Zlibrary:
         return self.__getBookFile(book["id"], book["hash"])
 
     def isLoggedIn(self) -> bool:
-        return self.loggedin
+        return self.__loggedin
 
     def sendCode(self, email: str, password: str, name: str) -> dict[str, str]:
         usr_data = {

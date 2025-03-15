@@ -40,7 +40,7 @@ class ebooks(Star):
 
             if email and password:
                 self.zlibrary = Zlibrary(email=email, password=password)
-                if self.zlibrary.loggedin:
+                if self.zlibrary.isLoggedIn():
                     logger.info("[ebooks] 已登录 Z-Library。")
                 else:
                     self._disable_zlib("登录 Z-Library 失败，禁用该平台。")
@@ -55,12 +55,8 @@ class ebooks(Star):
         logger.info(f"[ebooks] {reason}")
 
     async def terminate(self):
-        if self.zlibrary and self.zlibrary.loggedin:
-            try:
-                self.zlibrary.logout()
-            except:
-                logger.info(f"[ebooks] 登出 Z-Library 失败。")
-            self.zlibrary = None
+        if self.zlibrary and self.zlibrary.isLoggedIn():
+            self.zlibrary = Zlibrary()
 
 
     async def _is_url_accessible(self, url: str, proxy: bool=True) -> bool:
@@ -1052,7 +1048,7 @@ class ebooks(Star):
         try:
             logger.info(f"[Z-Library] Received books search query: {query}, limit: {limit}")
 
-            if not self.zlibrary.loggedin:
+            if not self.zlibrary.isLoggedIn():
                 return "[Z-Library] 未登录或登录失败。"
 
             # 调用 Zlibrary 的 search 方法进行搜索
@@ -1174,7 +1170,7 @@ class ebooks(Star):
             return
 
         try:
-            if not self.zlibrary.loggedin:
+            if not self.zlibrary.isLoggedIn():
                 yield event.plain_result("[Z-Library] 未登录或登录失败。")
                 return
 

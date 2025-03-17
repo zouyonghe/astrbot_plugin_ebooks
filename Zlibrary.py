@@ -323,7 +323,7 @@ class Zlibrary:
         headers = self.__headers.copy()
         headers["authority"] = ddl.split("/")[2]
 
-        res = requests.get(ddl, headers=headers)
+        res = requests.get(ddl, headers=headers, timeout=300)
         if res.status_code == 200:
             return filename, res.content
 

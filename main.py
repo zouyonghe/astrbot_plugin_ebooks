@@ -965,7 +965,7 @@ class ebooks(Star):
         try:
             async with aiohttp.ClientSession() as session:
                 # 发出 GET 请求并跟随跳转
-                async with session.get(book_url, allow_redirects=True, proxy=self.proxy) as response:
+                async with session.get(book_url, allow_redirects=True, proxy=self.proxy, timeout=300) as response:
                     if response.status == 200:
                         ebook_url = str(response.url)
                         logger.debug(f"[archive.org] 跳转后的下载地址: {ebook_url}")

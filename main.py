@@ -20,8 +20,9 @@ from data.plugins.astrbot_plugin_ebooks.annas_py import get_information as get_a
 from astrbot.api.all import *
 from astrbot.api.event.filter import *
 
+MAX_ZLIB_RETRY_COUNT = 3
 
-@register("ebooks", "buding", "一个功能强大的电子书搜索和下载插件", "1.0.7", "https://github.com/zouyonghe/astrbot_plugin_ebooks")
+@register("ebooks", "buding", "一个功能强大的电子书搜索和下载插件", "1.0.8", "https://github.com/zouyonghe/astrbot_plugin_ebooks")
 class ebooks(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
         super().__init__(context)
@@ -48,9 +49,9 @@ class ebooks(Star):
                     if self.zlibrary.isLoggedIn():
                         logger.info("[ebooks] 已登录 Z-Library。")
                     else:
-                        self._disable_zlib("登录 Z-Library 失败，禁用该平台。")
-                except:
-                    self._disable_zlib("登录 Z-Library 失败，禁用该平台。")
+                        logger.error("登录 Z-Library 失败。")
+                except Exception as e:
+                    logger.error(f"登录 Z-Library 失败，报错： {e}")
             else:
                 self._disable_zlib("未设置 Z-Library 账户，禁用该平台。")
 
@@ -1058,7 +1059,19 @@ class ebooks(Star):
             logger.info(f"[Z-Library] Received books search query: {query}, limit: {limit}")
 
             if not self.zlibrary.isLoggedIn():
-                return "[Z-Library] 未登录或登录失败。"
+                email = self.config.get("zlib_email", "").strip()
+                password = self.config.get("zlib_password", "").strip()
+                retry_count = 0
+                while retry_count < MAX_ZLIB_RETRY_COUNT:
+                    try:
+                        self.zlibrary.login(email, password)  # 尝试登录
+                        if self.zlibrary.isLoggedIn():  # 检查是否登录成功
+                            break
+                    except:  # 捕获登录过程中的异常
+                        pass
+                    retry_count += 1  # 增加重试计数
+                    if retry_count >= MAX_ZLIB_RETRY_COUNT:  # 超过最大重试次数
+                        return "[Z-Library] 登录失败。"
 
             # 调用 Zlibrary 的 search 方法进行搜索
             results = self.zlibrary.search(message=query, limit=limit)
@@ -1180,8 +1193,20 @@ class ebooks(Star):
 
         try:
             if not self.zlibrary.isLoggedIn():
-                yield event.plain_result("[Z-Library] 未登录或登录失败。")
-                return
+                email = self.config.get("zlib_email", "").strip()
+                password = self.config.get("zlib_password", "").strip()
+                retry_count = 0
+                while retry_count < MAX_ZLIB_RETRY_COUNT:
+                    try:
+                        self.zlibrary.login(email, password)  # 尝试登录
+                        if self.zlibrary.isLoggedIn():  # 检查是否登录成功
+                            break
+                    except:  # 捕获登录过程中的异常
+                        pass
+                    retry_count += 1  # 增加重试计数
+                    if retry_count >= MAX_ZLIB_RETRY_COUNT:  # 超过最大重试次数
+                        yield event.plain_result("[Z-Library] 登录失败。")
+                        return
 
             # 获取电子书详情，确保 ID 合法
             book_details = self.zlibrary.getBookInfo(book_id, hashid=book_hash)

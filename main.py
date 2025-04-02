@@ -142,7 +142,7 @@ class ebooks(Star):
         base, ext = os.path.splitext(filename)
         if len(filename.encode('utf-8')) > max_length:
             # 根据最大长度截取文件名，确保文件扩展名完整
-            truncated = base[:max_length - len(ext.encode('utf-8')) - 3] + "..."
+            truncated = base[:max_length - len(ext.encode('utf-8')) - 7] + " <省略>"
             return f"{truncated}{ext}"
         return filename
 

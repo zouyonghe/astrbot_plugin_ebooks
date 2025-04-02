@@ -137,7 +137,7 @@ class ebooks(Star):
         except Exception:
             return False  # 如果解析失败，说明不是图片
 
-    def _truncate_filename(self, filename, max_length=200):
+    def _truncate_filename(self, filename, max_length=100):
         # 保留文件扩展名
         base, ext = os.path.splitext(filename)
         if len(filename.encode('utf-8')) > max_length:

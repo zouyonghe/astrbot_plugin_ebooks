@@ -22,7 +22,7 @@ from astrbot.api.event.filter import *
 
 MAX_ZLIB_RETRY_COUNT = 3
 
-@register("ebooks", "buding", "一个功能强大的电子书搜索和下载插件", "1.0.8", "https://github.com/zouyonghe/astrbot_plugin_ebooks")
+@register("ebooks", "buding", "一个功能强大的电子书搜索和下载插件", "1.0.9", "https://github.com/zouyonghe/astrbot_plugin_ebooks")
 class ebooks(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
         super().__init__(context)
@@ -136,6 +136,15 @@ class ebooks(Star):
             return True  # Base64 是有效图片
         except Exception:
             return False  # 如果解析失败，说明不是图片
+
+    def _truncate_filename(self, filename, max_length=255):
+        # 保留文件扩展名
+        base, ext = os.path.splitext(filename)
+        if len(filename.encode('utf-8')) > max_length:
+            # 根据最大长度截取文件名，确保文件扩展名完整
+            truncated = base[:max_length - len(ext.encode('utf-8')) - 3] + "..."
+            return f"{truncated}{ext}"
+        return filename
 
     async def _search_calibre_web(self, query: str, limit: int = None):
         '''Call the Calibre-Web Catalog API to search for eBooks.'''
@@ -990,6 +999,8 @@ class ebooks(Star):
                             parsed_url = urlparse(ebook_url)
                             book_name = os.path.basename(parsed_url.path) or "unknown_book"
 
+                        book_name = self._truncate_filename(book_name)
+
                         # 构造临时文件路径
                         temp_file_path = os.path.join(self.TEMP_PATH, book_name)
 
@@ -1218,6 +1229,8 @@ class ebooks(Star):
             downloaded_book = self.zlibrary.downloadBook({"id": book_id, "hash": book_hash})
             if downloaded_book:
                 book_name, book_content = downloaded_book
+                book_name = self._truncate_filename(book_name)
+
                 # 构造临时文件路径
                 temp_file_path = os.path.join(self.TEMP_PATH, book_name)
 
@@ -1644,5 +1657,3 @@ class ebooks(Star):
         """
         async for result in self.download_all_platforms(event, arg1, arg2):
             yield result
-
-

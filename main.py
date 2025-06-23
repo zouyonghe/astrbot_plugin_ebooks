@@ -1,4 +1,3 @@
-import asyncio
 import io
 import random
 import re
@@ -6,23 +5,101 @@ import xml.etree.ElementTree as ET
 from datetime import datetime
 from typing import Optional
 from urllib.parse import quote_plus, urljoin, unquote, urlparse
-from PIL import Image as Img
 
 import aiofiles
 import aiohttp
+from PIL import Image as Img
 from aiohttp import ClientPayloadError
 from bs4 import BeautifulSoup
 
-from data.plugins.astrbot_plugin_ebooks.annas_py.models.args import Language
-from data.plugins.astrbot_plugin_ebooks.Zlibrary import Zlibrary
-from data.plugins.astrbot_plugin_ebooks.annas_py import search as annas_search
-from data.plugins.astrbot_plugin_ebooks.annas_py import get_information as get_annas_information
 from astrbot.api.all import *
 from astrbot.api.event.filter import *
+from data.plugins.astrbot_plugin_ebooks.Zlibrary import Zlibrary
+from data.plugins.astrbot_plugin_ebooks.annas_py import get_information as get_annas_information
+from data.plugins.astrbot_plugin_ebooks.annas_py import search as annas_search
+from data.plugins.astrbot_plugin_ebooks.annas_py.models.args import Language
 
 MAX_ZLIB_RETRY_COUNT = 3
 
-@register("ebooks", "buding", "一个功能强大的电子书搜索和下载插件", "1.0.10", "https://github.com/zouyonghe/astrbot_plugin_ebooks")
+
+def _is_base64_image(base64_data: str) -> bool:
+    """
+    检测 Base64 数据是否为有效图片
+    :param base64_data: Base64 编码的字符串
+    :return: 如果是图片返回 True，否则返回 False
+    """
+    try:
+        # 解码 Base64 数据
+        image_data = base64.b64decode(base64_data)
+        # 尝试用 Pillow 打开图片
+        image = Img.open(io.BytesIO(image_data))
+        # 如果图片能正确被打开，再检查格式是否为支持的图片格式
+        image.verify()  # 验证图片
+        return True  # Base64 是有效图片
+    except Exception:
+        return False  # 如果解析失败，说明不是图片
+
+
+def _truncate_filename(filename, max_length=100):
+    # 保留文件扩展名
+    base, ext = os.path.splitext(filename)
+    if len(filename.encode('utf-8')) > max_length:
+        # 根据最大长度截取文件名，确保文件扩展名完整
+        truncated = base[:max_length - len(ext.encode('utf-8')) - 7] + " <省略>"
+        return f"{truncated}{ext}"
+    return filename
+
+
+def _is_valid_calibre_book_url(book_url: str) -> bool:
+    """检测电子书下载链接格式是否合法"""
+    if not book_url:
+        return False  # URL 不能为空
+
+    # 检测是否是合法的 URL (基础验证)
+    pattern = re.compile(r'^https?://.+/.+$')
+    if not pattern.match(book_url):
+        return False
+
+    # 检查是否满足特定的结构，例如包含 /opds/download/
+    if "/opds/download/" not in book_url:
+        return False
+
+    return True
+
+
+def _is_html(content):
+    """Determine whether a string is in HTML format."""
+    if not isinstance(content, str):
+        return False
+    return bool(re.search(r'<[^>]+>', content))
+
+
+def _is_valid_zlib_book_id(book_id: str) -> bool:
+    """检测 zlib ID 是否为纯数字"""
+    if not book_id:
+        return False
+    return book_id.isdigit()
+
+
+def _is_valid_zlib_book_hash(hash: str) -> bool:
+    """检测 zlib Hash 是否为 6 位十六进制"""
+    if not hash:
+        return False
+    pattern = re.compile(r'^[a-f0-9]{6}$', re.IGNORECASE)  # 忽略大小写
+    return bool(pattern.match(hash))
+
+
+def _is_valid_annas_book_id(book_id: str) -> bool:
+    """检测 Liber3 的 book_id 是否有效"""
+    if not book_id:
+        return False  # 不能为空
+
+    # 使用正则表达式验证是否是以 A 开头后接 32 位十六进制字符串
+    pattern = re.compile(r'^A[a-fA-F0-9]{32}$')
+    return bool(pattern.match(book_id))
+
+
+@register("ebooks", "buding", "一个功能强大的电子书搜索和下载插件", "1.1.0", "https://github.com/zouyonghe/astrbot_plugin_ebooks")
 class ebooks(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
         super().__init__(context)
@@ -115,36 +192,12 @@ class ebooks(Star):
             # 尝试已接收的数据部分
             if 'content' in locals():  # 如果部分内容已下载
                 base64_data = base64.b64encode(content).decode("utf-8")
-                if self._is_base64_image(base64_data):  # 检查 Base64 数据是否有效
+                if _is_base64_image(base64_data):  # 检查 Base64 数据是否有效
                     return base64_data
+                return None
+            return None
         except:
             return None
-
-    def _is_base64_image(self, base64_data: str) -> bool:
-        """
-        检测 Base64 数据是否为有效图片
-        :param base64_data: Base64 编码的字符串
-        :return: 如果是图片返回 True，否则返回 False
-        """
-        try:
-            # 解码 Base64 数据
-            image_data = base64.b64decode(base64_data)
-            # 尝试用 Pillow 打开图片
-            image = Img.open(io.BytesIO(image_data))
-            # 如果图片能正确被打开，再检查格式是否为支持的图片格式
-            image.verify()  # 验证图片
-            return True  # Base64 是有效图片
-        except Exception:
-            return False  # 如果解析失败，说明不是图片
-
-    def _truncate_filename(self, filename, max_length=100):
-        # 保留文件扩展名
-        base, ext = os.path.splitext(filename)
-        if len(filename.encode('utf-8')) > max_length:
-            # 根据最大长度截取文件名，确保文件扩展名完整
-            truncated = base[:max_length - len(ext.encode('utf-8')) - 7] + " <省略>"
-            return f"{truncated}{ext}"
-        return filename
 
     async def _search_calibre_web(self, query: str, limit: int = None):
         '''Call the Calibre-Web Catalog API to search for eBooks.'''
@@ -278,7 +331,7 @@ class ebooks(Star):
         chain = [Plain(f"{item['title']}")]
         if item.get("cover_link"):
             base64_image = await self._download_and_convert_to_base64(item["cover_link"])
-            if self._is_base64_image(base64_image):
+            if _is_base64_image(base64_image):
                 chain.append(Image.fromBase64(base64_image))
         else:
             chain.append(Plain("\n"))
@@ -333,22 +386,6 @@ class ebooks(Star):
             logger.error(f"[Calibre-Web] 搜索失败: {e}")
             return "Calibre-Web] 搜索失败，请检查控制台输出"
 
-    def _is_valid_calibre_book_url(self, book_url: str) -> bool:
-        """检测电子书下载链接格式是否合法"""
-        if not book_url:
-            return False  # URL 不能为空
-
-        # 检测是否是合法的 URL (基础验证)
-        pattern = re.compile(r'^https?://.+/.+$')
-        if not pattern.match(book_url):
-            return False
-
-        # 检查是否满足特定的结构，例如包含 /opds/download/
-        if "/opds/download/" not in book_url:
-            return False
-
-        return True
-
     @command_group("calibre")
     def calibre(self):
         pass
@@ -384,7 +421,7 @@ class ebooks(Star):
             yield event.plain_result("[Calibre-Web] 功能未启用。")
             return
 
-        if not self._is_valid_calibre_book_url(book_url):
+        if not _is_valid_calibre_book_url(book_url):
             yield event.plain_result("[Calibre-Web] 请提供有效的电子书链接。")
             return
 
@@ -415,7 +452,7 @@ class ebooks(Star):
                             return 
                             
                         # 发送文件到用户
-                        file = File(name=book_name, file=book_url)
+                        file = File(name=book_name, url=book_url)
                         yield event.chain_result([file])
                     else:
                         yield event.plain_result(f"[Calibre-Web] 无法下载电子书，状态码: {response.status}")
@@ -454,7 +491,7 @@ class ebooks(Star):
                 yield event.plain_result(result)
             elif isinstance(result, list):
                 guidance = f"[Calibre-Web] 如下是随机推荐的 {n} 本电子书。"
-                nodes = [Node(uin=event.get_self_id(), name="Calibre-Web", content=guidance)]
+                nodes = [Node(uin=event.get_self_id(), name="Calibre-Web", content=[Plain(guidance)])]
                 nodes.extend(result)
                 ns = Nodes([])
                 ns.nodes = nodes
@@ -470,7 +507,7 @@ class ebooks(Star):
     async def search_calibre_books(self, event: AstrMessageEvent, query: str):
         """Search books by keywords or title through Calibre-Web.
         When to use:
-            Use this method to search for books in the Calibre-Web catalog when user knows the title or keyword.
+            Use this method to search for books in the Calibre-Web catalog when the user knows the title or keyword.
             This method cannot be used for downloading books and should only be used for searching purposes.
 
         Args:
@@ -703,7 +740,7 @@ class ebooks(Star):
         ebook_url = f"https://gateway-ipfs.st/ipfs/{ipfs_cid}?filename={book_name}.{extension}"
 
         # 使用 File 对象，通过 chain_result 下载
-        file = File(name=f"{book_name}.{extension}", file=ebook_url)
+        file = File(name=f"{book_name}.{extension}", url=ebook_url)
         yield event.chain_result([file])
 
     # @llm_tool("search_liber3_books")
@@ -821,7 +858,7 @@ class ebooks(Star):
 
             # 判断并解析简介
             if isinstance(description, str):
-                if self._is_html(description):
+                if _is_html(description):
                     description = self._parse_html_to_text(description)
                 else:
                     description = description.strip()
@@ -845,12 +882,6 @@ class ebooks(Star):
         except Exception as e:
             logger.error(f"[archive.org] 获取 Metadata 数据时发生错误: {e}")
         return {}
-
-    def _is_html(self, content):
-        """Determine whether a string is in HTML format."""
-        if not isinstance(content, str):
-            return False
-        return bool(re.search(r'<[^>]+>', content))
 
     def _parse_html_to_text(self, html_content):
         """Parse HTML content into plain text."""
@@ -899,7 +930,7 @@ class ebooks(Star):
                 # 异步下载和处理封面图片
                 if book.get("cover"):
                     base64_image = await self._download_and_convert_to_base64(book.get("cover"))
-                    if base64_image and self._is_base64_image(base64_image):
+                    if base64_image and _is_base64_image(base64_image):
                         chain.append(Image.fromBase64(base64_image))
                     else:
                         chain.append(Plain("\n"))
@@ -1000,7 +1031,7 @@ class ebooks(Star):
                             parsed_url = urlparse(ebook_url)
                             book_name = os.path.basename(parsed_url.path) or "unknown_book"
 
-                        book_name = self._truncate_filename(book_name)
+                        book_name = _truncate_filename(book_name)
 
                         # 构造临时文件路径
                         temp_file_path = os.path.join(self.TEMP_PATH, book_name)
@@ -1016,9 +1047,6 @@ class ebooks(Star):
                         file = File(name=book_name, file=temp_file_path)
                         yield event.chain_result([file])
                         os.remove(temp_file_path)
-
-                        # file = File(name=book_name, file=ebook_url)
-                        # yield event.chain_result([file])
                     else:
                         yield event.plain_result(f"[archive.org] 无法下载电子书，状态码: {response.status}")
         except Exception as e:
@@ -1100,7 +1128,7 @@ class ebooks(Star):
                 # 异步处理封面图片
                 if book.get("cover"):
                     base64_image = await self._download_and_convert_to_base64(book.get("cover"))
-                    if base64_image and self._is_base64_image(base64_image):
+                    if base64_image and _is_base64_image(base64_image):
                         chain.append(Image.fromBase64(base64_image))
                     else:
                         chain.append(Plain("\n"))
@@ -1145,19 +1173,6 @@ class ebooks(Star):
             logger.error(f"[Z-Library] Error during book search: {e}")
             return "[Z-Library] 搜索电子书时发生错误，请稍后再试。"
 
-    def _is_valid_zlib_book_id(self, book_id: str) -> bool:
-        """检测 zlib ID 是否为纯数字"""
-        if not book_id:
-            return False
-        return book_id.isdigit()
-
-    def _is_valid_zlib_book_hash(self, hash: str) -> bool:
-        """检测 zlib Hash 是否为 6 位十六进制"""
-        if not hash:
-            return False
-        pattern = re.compile(r'^[a-f0-9]{6}$', re.IGNORECASE)  # 忽略大小写
-        return bool(pattern.match(hash))
-
     @command_group("zlib")
     def zlib(self):
         pass
@@ -1195,7 +1210,7 @@ class ebooks(Star):
             yield event.plain_result("[Z-Library] 功能未启用。")
             return
 
-        if not self._is_valid_zlib_book_id(book_id) or not self._is_valid_zlib_book_hash(book_hash):
+        if not _is_valid_zlib_book_id(book_id) or not _is_valid_zlib_book_hash(book_hash):
             yield event.plain_result("[Z-Library] 请使用 /zlib download <id> <hash> 下载。")
             return
 
@@ -1230,7 +1245,7 @@ class ebooks(Star):
             downloaded_book = self.zlibrary.downloadBook({"id": book_id, "hash": book_hash})
             if downloaded_book:
                 book_name, book_content = downloaded_book
-                book_name = self._truncate_filename(book_name)
+                book_name = _truncate_filename(book_name)
 
                 # 构造临时文件路径
                 temp_file_path = os.path.join(self.TEMP_PATH, book_name)
@@ -1314,7 +1329,7 @@ class ebooks(Star):
                 # 异步处理封面图片
                 if book.thumbnail:
                     base64_image = await self._download_and_convert_to_base64(book.thumbnail)
-                    if base64_image and self._is_base64_image(base64_image):
+                    if base64_image and _is_base64_image(base64_image):
                         chain.append(Image.fromBase64(base64_image))
                     else:
                         chain.append(Plain("\n"))
@@ -1351,15 +1366,6 @@ class ebooks(Star):
         except Exception as e:
             logger.error(f"[Anna's Archive] Error during book search: {e}")
             return "[Anna's Archive] 搜索电子书时发生错误，请稍后再试。"
-
-    def _is_valid_annas_book_id(self, book_id: str) -> bool:
-        """检测 Liber3 的 book_id 是否有效"""
-        if not book_id:
-            return False  # 不能为空
-
-        # 使用正则表达式验证是否是以 A 开头后接 32 位十六进制字符串
-        pattern = re.compile(r'^A[a-fA-F0-9]{32}$')
-        return bool(pattern.match(book_id))
 
     @command_group("annas")
     def annas(self):
@@ -1449,7 +1455,7 @@ class ebooks(Star):
     
     @ebooks.command("help")
     async def show_help(self, event: AstrMessageEvent):
-        '''显示 Calibre-Web 插件帮助信息'''
+        """显示 Calibre-Web 插件帮助信息"""
         help_msg = [
             "📚 **ebooks 插件使用指南**",
             "",
@@ -1649,7 +1655,7 @@ class ebooks(Star):
 
         When to use:
             This method facilitates downloading of ebooks by automatically identifying the platform
-            from the provided identifier (ID, URL, or Hash), and then calling the corresponding platform's download function.
+            from the provided identifier (ID, URL, or Hash) and then calling the corresponding platform's download function.
             Unless the platform is specifically mentioned, this function serves as the default for downloading ebooks.
 
         Args:

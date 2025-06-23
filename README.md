@@ -13,7 +13,8 @@
 - **Calibre-Web**
 - **Liber3**
 - **Z-Library**
-- **Archive**
+- **Archive.org**
+- **Anna‘s Archive**
 
 通过搜索关键词，可以快速找到对应的电子书信息，返回的结果包括标题、作者、简介、封面、出版年份、文件类型和下载链接等。
 
@@ -43,15 +44,34 @@
     - 搜索和下载全球最大的免费电子书数据库。
     - 支持通过 ID 或哈希值下载电子书。
 
-4. **Archive**
+4. **Archive.org**
     - 通过高级搜索 API 搜索电子书。
     - 过滤支持的格式（如 PDF/EPUB）。
 
+5. **Anna‘s Archive**
+    - 暂不支持下载，只提供下载链接
+
 ## 使用指南
+
+### LLM函数调用（推荐）
+
+- 发送`/搜索电子书 linux`等，调用多平台整合搜索
+- 发送`/下载电子书 <link or ID,Hash>`，自动识别下载信息下载电子书
+- 发送`推荐10本电子书`，暂只支持从calibre-web随机推荐指定数量电子书
 
 ### 命令参考
 
 以下为插件提供的命令与相关功能（支持在 AstrBot 中调用）：
+
+####帮助信息
+
+`ebooks help`：显示插件帮助信息
+
+#### 整合搜索即下载
+
+- `ebooks search <linux> [10]`： 最后的数字可选，代表每个平台搜索的数量，默认为20
+
+- `ebooks download <link or ID,Hash>`：下载指定标识的电子书电子书
 
 #### **Calibre-Web**
 
@@ -126,5 +146,5 @@
 - **插件名称**：ebooks
 - **标识符**：buding
 - **描述**：一个功能强大的电子书搜索和下载插件
-- **版本**：1.0.0
+- **版本**：1.0.10
 - **源码**：[GitHub 地址](https://github.com/zouyonghe/astrbot_plugin_ebooks)

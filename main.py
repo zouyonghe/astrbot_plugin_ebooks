@@ -22,7 +22,7 @@ from astrbot.api.event.filter import *
 
 MAX_ZLIB_RETRY_COUNT = 3
 
-@register("ebooks", "buding", "一个功能强大的电子书搜索和下载插件", "1.0.9", "https://github.com/zouyonghe/astrbot_plugin_ebooks")
+@register("ebooks", "buding", "一个功能强大的电子书搜索和下载插件", "1.0.10", "https://github.com/zouyonghe/astrbot_plugin_ebooks")
 class ebooks(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
         super().__init__(context)
@@ -331,6 +331,7 @@ class ebooks(Star):
                 return await self._convert_calibre_results_to_nodes(event, results)
         except Exception as e:
             logger.error(f"[Calibre-Web] 搜索失败: {e}")
+            return "Calibre-Web] 搜索失败，请检查控制台输出"
 
     def _is_valid_calibre_book_url(self, book_url: str) -> bool:
         """检测电子书下载链接格式是否合法"""
@@ -1542,7 +1543,7 @@ class ebooks(Star):
                     node = Node(
                         uin=event.get_self_id(),
                         name="ebooks",
-                        content=platform_results,
+                        content=[Plain(platform_results)],
                     )
                     ns.nodes.append(node)
                     continue

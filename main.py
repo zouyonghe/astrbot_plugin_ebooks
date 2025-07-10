@@ -1572,7 +1572,7 @@ class ebooks(Star):
                         contents = []
                         for n in platform_results:
                             if isinstance(n, Node):
-                                contents.append(n)
+                                contents.append(n.content)
                         for i in range(0, len(contents), 30):
                             # 创建新的 node 包含不超过 30 条结果
                             chunk_results = contents[i:i + 30]

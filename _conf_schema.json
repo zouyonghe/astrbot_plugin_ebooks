@@ -1,4 +1,10 @@
 {
+    "enable_merge_forward": {
+        "type": "bool",
+        "description": "启用消息和并转发",
+        "default": true,
+        "hint": "新版本QQ存在不支持查看嵌套消息的问题"
+    },
     "enable_calibre": {
         "type": "bool",
         "description": "启用 Calibre-Web 电子书搜索",

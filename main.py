@@ -99,7 +99,7 @@ def _is_valid_annas_book_id(book_id: str) -> bool:
     return bool(pattern.match(book_id))
 
 
-@register("ebooks", "buding", "一个功能强大的电子书搜索和下载插件", "1.1.0", "https://github.com/zouyonghe/astrbot_plugin_ebooks")
+@register("ebooks", "buding", "一个功能强大的电子书搜索和下载插件", "1.1.1", "https://github.com/zouyonghe/astrbot_plugin_ebooks")
 class ebooks(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
         super().__init__(context)
@@ -1542,28 +1542,42 @@ class ebooks(Star):
             # 并发运行所有任务
             search_results = await asyncio.gather(*tasks)
             # 将任务结果逐一发送
-            ns = Nodes([])
+            if self.config.get("enable_merge_forward", False):
+                ns = Nodes([])
 
-            for platform_results in search_results:  # 遍历每个平台结果
-                if isinstance(platform_results, str):
-                    node = Node(
-                        uin=event.get_self_id(),
-                        name="ebooks",
-                        content=[Plain(platform_results)],
-                    )
-                    ns.nodes.append(node)
-                    continue
-                for i in range(0, len(platform_results), 30):  # 每30条数据分割成一个node
-                    # 创建新的 node 包含不超过 20 条结果
-                    chunk_results = platform_results[i:i + 30]
-                    node = Node(
-                        uin=event.get_self_id(),
-                        name="ebooks",
-                        content=chunk_results,
-                    )
-                    ns.nodes.append(node)
-            yield event.chain_result([ns])
-
+                for platform_results in search_results:  # 遍历每个平台结果
+                    if isinstance(platform_results, str):
+                        node = Node(
+                            uin=event.get_self_id(),
+                            name="ebooks",
+                            content=[Plain(platform_results)],
+                        )
+                        ns.nodes.append(node)
+                        continue
+                    for i in range(0, len(platform_results), 30):  # 每30条数据分割成一个node
+                        # 创建新的 node 包含不超过 30 条结果
+                        chunk_results = platform_results[i:i + 30]
+                        node = Node(
+                            uin=event.get_self_id(),
+                            name="ebooks",
+                            content=chunk_results,
+                        )
+                        ns.nodes.append(node)
+                yield event.chain_result([ns])
+            else:
+                for platform_results in search_results:
+                    if isinstance(platform_results, str):
+                        yield event.plain_result(platform_results)
+                    else:
+                        for i in range(0, len(platform_results), 30):  # 每30条数据分割成一个node
+                            # 创建新的 node 包含不超过 30 条结果
+                            chunk_results = platform_results[i:i + 30]
+                            node = Node(
+                                uin=event.get_self_id(),
+                                name="ebooks",
+                                content=chunk_results,
+                            )
+                            yield event.chain_result([node])
         except Exception as e:
             logger.error(f"[ebooks] Error during multi-platform search: {e}")
             yield event.plain_result(f"[ebooks] 搜索电子书时发生错误，请稍后再试。")

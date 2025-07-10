@@ -1569,9 +1569,13 @@ class ebooks(Star):
                     if isinstance(platform_results, str):
                         yield event.plain_result(platform_results)
                     else:
-                        for i in range(0, len(platform_results), 30):  # 每30条数据分割成一个node
+                        contents = []
+                        for n in platform_results:
+                            if isinstance(n, Node):
+                                contents.append(n)
+                        for i in range(0, len(contents), 30):
                             # 创建新的 node 包含不超过 30 条结果
-                            chunk_results = platform_results[i:i + 30]
+                            chunk_results = contents[i:i + 30]
                             node = Node(
                                 uin=event.get_self_id(),
                                 name="ebooks",

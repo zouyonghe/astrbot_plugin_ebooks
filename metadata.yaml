@@ -1,6 +1,6 @@
 name: astrbot_plugin_ebooks
 desc: 一个功能强大的电子书搜索下载的插件
 help: 输入 /ebooks help 查看关键词回复帮助。
-version: v1.1.1
+version: v1.1.2
 author: buding
 repo: https://github.com/zouyonghe/astrbot_plugin_opds

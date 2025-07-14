@@ -99,7 +99,7 @@ def _is_valid_annas_book_id(book_id: str) -> bool:
     return bool(pattern.match(book_id))
 
 
-@register("ebooks", "buding", "一个功能强大的电子书搜索和下载插件", "1.1.1", "https://github.com/zouyonghe/astrbot_plugin_ebooks")
+@register("ebooks", "buding", "一个功能强大的电子书搜索和下载插件", "1.1.2", "https://github.com/zouyonghe/astrbot_plugin_ebooks")
 class ebooks(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
         super().__init__(context)
@@ -1577,12 +1577,7 @@ class ebooks(Star):
                             ns = Nodes([])
                             for i in range(0, len(platform_results), 30):  # 每30条数据分割成一个node
                                 chunk_results = platform_results[i:i + 30]
-                                node = Node(
-                                    uin=event.get_self_id(),
-                                    name="ebooks",
-                                    content=chunk_results,
-                                )
-                                ns.nodes.append(node)
+                                ns = Nodes(chunk_results)
                             yield event.chain_result([ns])
         except Exception as e:
             logger.error(f"[ebooks] Error during multi-platform search: {e}")

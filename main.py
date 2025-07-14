@@ -1567,12 +1567,22 @@ class ebooks(Star):
             else:
                 for platform_results in search_results:
                     if isinstance(platform_results, str):
+
                         yield event.plain_result(platform_results)
-                    else:
-                        for i in range(0, len(platform_results), 30):
-                            # 创建新的 node 包含不超过 30 条结果
-                            chunk_results = platform_results[i:i + 30]
-                            ns = Nodes(chunk_results)
+                    elif isinstance(platform_results, list):
+                        if len(platform_results) <= 30:
+                            ns = Nodes(platform_results)
+                            yield event.chain_result([ns])
+                        else:
+                            ns = Nodes([])
+                            for i in range(0, len(platform_results), 30):  # 每30条数据分割成一个node
+                                chunk_results = platform_results[i:i + 30]
+                                node = Node(
+                                    uin=event.get_self_id(),
+                                    name="ebooks",
+                                    content=chunk_results,
+                                )
+                                ns.nodes.append(node)
                             yield event.chain_result([ns])
         except Exception as e:
             logger.error(f"[ebooks] Error during multi-platform search: {e}")

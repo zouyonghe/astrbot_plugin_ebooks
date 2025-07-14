@@ -1578,7 +1578,7 @@ class ebooks(Star):
                             for i in range(0, len(platform_results), 30):  # 每30条数据分割成一个node
                                 chunk_results = platform_results[i:i + 30]
                                 ns = Nodes(chunk_results)
-                            yield event.chain_result([ns])
+                                yield event.chain_result([ns])
         except Exception as e:
             logger.error(f"[ebooks] Error during multi-platform search: {e}")
             yield event.plain_result(f"[ebooks] 搜索电子书时发生错误，请稍后再试。")

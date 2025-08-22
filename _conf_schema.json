@@ -52,5 +52,11 @@
         "description": "Z-Library 登录密码",
         "default": "",
         "hint": "登录 Z-Library 的密码"
+    },
+    "max_results": {
+        "type": "string",
+        "description": "默认最大返回结果数量",
+        "default": "20",
+        "hint": "每次搜索默认返回的最大结果数量，单次搜索命令可覆盖此值，范围1-50"
     }
 }

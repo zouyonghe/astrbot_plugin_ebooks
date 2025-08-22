@@ -1521,7 +1521,7 @@ class ebooks(Star):
             yield event.plain_result("[ebooks] 请提供电子书关键词以进行搜索。")
             return
 
-        if not (1 <= int(limit) <= 100):  # Validate limit
+        if not (1 <= int(limit) <= 50):  # Validate limit
             yield event.plain_result("[ebooks] 请确认搜索返回结果数量在 1-100 之间。")
             return
 

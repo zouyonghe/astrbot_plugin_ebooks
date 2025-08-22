@@ -21,7 +21,6 @@ from data.plugins.astrbot_plugin_ebooks.annas_py.models.args import Language
 
 MAX_ZLIB_RETRY_COUNT = 3
 
-
 def _is_base64_image(base64_data: str) -> bool:
     """
     检测 Base64 数据是否为有效图片
@@ -78,7 +77,7 @@ def _is_valid_zlib_book_id(book_id: str) -> bool:
     """检测 zlib ID 是否为纯数字"""
     if not book_id:
         return False
-    return book_id.isdigit()
+    return str(book_id).isdigit()
 
 
 def _is_valid_zlib_book_hash(hash: str) -> bool:
@@ -107,6 +106,7 @@ class ebooks(Star):
         self.proxy = os.environ.get("https_proxy")
         self.TEMP_PATH = os.path.abspath("data/temp")
         os.makedirs(self.TEMP_PATH, exist_ok=True)
+        self.max_results = self.config.get("max_results", 20)   # 默认最大返回结果数量
 
         # 初始化 Calibre 配置
         if self.config.get("enable_calibre", False) and not self.config.get("calibre_web_url", "").strip():
@@ -364,14 +364,14 @@ class ebooks(Star):
         tasks = [construct_node(book) for book in results]
         return await asyncio.gather(*tasks)
 
-    async def _search_calibre_nodes(self, event: AstrMessageEvent, query: str, limit: str = "20"):
+    async def _search_calibre_nodes(self, event: AstrMessageEvent, query: str, limit: str=""):
         if not self.config.get("enable_calibre", False):
             return "[Calibre-Web] 功能未启用。"
 
         if not query:
             return "[Calibre-Web] 请提供电子书关键词以进行搜索。"
 
-        limit = int(limit) if limit.isdigit() else 20
+        limit = int(limit) if str(limit).isdigit() else int(self.max_results)
         if not (1 <= limit <= 100):  # Validate limit
             return "[Calibre-Web] 请确认搜索返回结果数量在 1-100 之间。"
 
@@ -391,8 +391,9 @@ class ebooks(Star):
         pass
 
     @calibre.command("search")
-    async def search_calibre(self, event: AstrMessageEvent, query: str, limit: str="20"):
+    async def search_calibre(self, event: AstrMessageEvent, query: str, limit: str=""):
         """搜索 calibre-web 电子书"""
+        limit = int(limit) if str(limit).isdigit() else int(self.max_results)
         result = await self._search_calibre_nodes(event, query, limit)
         if isinstance(result, str):
             yield event.plain_result(result)
@@ -611,7 +612,7 @@ class ebooks(Star):
 
         return None
 
-    async def _search_liber3_nodes(self, event: AstrMessageEvent, query: str, limit: str = "20"):
+    async def _search_liber3_nodes(self, event: AstrMessageEvent, query: str, limit: str = ""):
         # 检查功能是否启用
         if not self.config.get("enable_liber3", False):
             return "[Liber3] 功能未启用。"
@@ -621,7 +622,7 @@ class ebooks(Star):
             return "[Liber3] 请提供电子书关键词以进行搜索。"
 
         # 校验 limit 参数
-        limit = int(limit) if limit.isdigit() else 20
+        limit = int(limit) if str(limit).isdigit() else int(self.max_results)
         if not (1 <= limit <= 100):  # 确保返回的结果数量有效
             return "[Liber3] 请确认搜索返回结果数量在 1-100 之间。"
 
@@ -681,8 +682,9 @@ class ebooks(Star):
         pass
 
     @liber3.command("search")
-    async def search_liber3(self, event: AstrMessageEvent, query: str = None, limit: str="20"):
+    async def search_liber3(self, event: AstrMessageEvent, query: str = None, limit: str=""):
         """搜索 Liber3 电子书"""
+        limit = int(limit) if str(limit).isdigit() else int(self.max_results)
         result = await self._search_liber3_nodes(event, query, limit)
 
         # 根据返回值类型处理结果
@@ -900,7 +902,7 @@ class ebooks(Star):
 
         return bool(pattern.match(book_url))
 
-    async def _search_archive_nodes(self, event: AstrMessageEvent, query: str = None, limit: str = "20"):
+    async def _search_archive_nodes(self, event: AstrMessageEvent, query: str = None, limit: str = ""):
         if not self.config.get("enable_archive", False):
             return "[archive.org] 功能未启用。"
 
@@ -910,7 +912,7 @@ class ebooks(Star):
         if not await self._is_url_accessible("https://archive.org"):
             return "[archive.org] 无法连接到 archive.org。"
 
-        limit = int(limit) if limit.isdigit() else 20
+        limit = int(limit) if str(limit).isdigit() else self.max_results
         if limit < 1:
             return "[archive.org] 请确认搜索返回结果数量在 1-60 之间。"
         if limit > 60:
@@ -964,8 +966,9 @@ class ebooks(Star):
         pass
 
     @archive.command("search")
-    async def search_archive(self, event: AstrMessageEvent, query: str = None, limit: str = "20"):
+    async def search_archive(self, event: AstrMessageEvent, query: str = None, limit: str = ""):
         """搜索 archive.org 电子书"""
+        limit = int(limit) if str(limit).isdigit() else int(self.max_results)
         result = await self._search_archive_nodes(event, query, limit)
 
         # 根据返回值类型处理结果
@@ -1079,7 +1082,7 @@ class ebooks(Star):
         async for result in self.download_archive(event, download_url):
             yield result
 
-    async def _search_zlib_nodes(self,event: AstrMessageEvent, query: str, limit: str = "20"):
+    async def _search_zlib_nodes(self,event: AstrMessageEvent, query: str, limit: str = ""):
         if not self.config.get("enable_zlib", False):
             return "[Z-Library] 功能未启用。"
 
@@ -1089,7 +1092,7 @@ class ebooks(Star):
         if not query:
             return "[Z-Library] 请提供电子书关键词以进行搜索。"
 
-        limit = int(limit) if limit.isdigit() else 20
+        limit = int(limit) if str(limit).isdigit() else self.max_results
         if limit < 1:
             return "[Z-Library] 请确认搜索返回结果数量在 1-60 之间。"
         if limit > 60:
@@ -1178,8 +1181,9 @@ class ebooks(Star):
         pass
 
     @zlib.command("search")
-    async def search_zlib(self, event: AstrMessageEvent, query: str = None, limit: str = "20"):
+    async def search_zlib(self, event: AstrMessageEvent, query: str = None, limit: str = ""):
         """搜索 Zlibrary 电子书"""
+        limit = int(limit) if str(limit).isdigit() else int(self.max_results)
         result = await self._search_zlib_nodes(event, query, limit)
 
         # 根据返回值类型处理结果
@@ -1295,7 +1299,7 @@ class ebooks(Star):
         async for result in self.download_zlib(event, book_id, book_hash):
             yield result
 
-    async def _search_annas_nodes(self, event: AstrMessageEvent, query: str, limit: str = "20"):
+    async def _search_annas_nodes(self, event: AstrMessageEvent, query: str, limit: str = ""):
         if not self.config.get("enable_annas", False):
             return "[Anna's Archive] 功能未启用。"
 
@@ -1305,7 +1309,7 @@ class ebooks(Star):
         if not query:
             return "[Anna's Archive] 请提供电子书关键词以进行搜索。"
 
-        limit = int(limit) if limit.isdigit() else 20
+        limit = int(limit) if str(limit).isdigit() else self.max_results
         if limit < 1:
             return "[Anna's Archive] 请确认搜索返回结果数量在 1-60 之间。"
         if limit > 60:
@@ -1372,8 +1376,9 @@ class ebooks(Star):
         pass
 
     @annas.command("search")
-    async def search_annas(self, event: AstrMessageEvent, query: str, limit: str = "20"):
+    async def search_annas(self, event: AstrMessageEvent, query: str, limit: str = ""):
         """搜索 anna's archive 电子书"""
+        limit = int(limit) if str(limit).isdigit() else int(self.max_results)
         result = await self._search_annas_nodes(event, query, limit)
 
         # 根据返回值类型处理结果
@@ -1507,10 +1512,11 @@ class ebooks(Star):
         yield event.plain_result("\n".join(help_msg))
 
     @ebooks.command("search")
-    async def search_all_platforms(self, event: AstrMessageEvent, query: str = None, limit: str = "20"):
+    async def search_all_platforms(self, event: AstrMessageEvent, query: str = None, limit: str = ""):
         """
         同时在所有支持的平台中搜索电子书，异步运行，每个平台返回自己的搜索结果格式。
         """
+        limit = int(limit) if str(limit).isdigit() else int(self.max_results)
         if not query:
             yield event.plain_result("[ebooks] 请提供电子书关键词以进行搜索。")
             return

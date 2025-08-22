@@ -1,7 +1,7 @@
 {
     "enable_merge_forward": {
         "type": "bool",
-        "description": "启用消息和并转发",
+        "description": "启用消息合并转发",
         "default": true,
         "hint": "新版本QQ存在不支持查看嵌套消息的问题"
     },
@@ -57,6 +57,6 @@
         "type": "string",
         "description": "默认最大返回结果数量",
         "default": "20",
-        "hint": "每次搜索默认返回的最大结果数量，单次搜索命令可覆盖此值，范围1-50"
+        "hint": "每次搜索默认返回的最大结果数量，函数工具搜索会默认使用此设置，命令搜索可覆盖此值，范围1-50"
     }
 }

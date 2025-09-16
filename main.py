@@ -1208,7 +1208,7 @@ class ebooks(Star):
             raise ValueError("Unknown result type.")
 
     @zlib.command("download")
-    async def download_zlib(self, event: AstrMessageEvent, book_id: str = None, book_hash: str = None):
+    async def download_zlib(self, event: AstrMessageEvent, book_id: str = "", book_hash: str = ""):
         """下载 Z-Library 电子书"""
         if not self.config.get("enable_zlib", False):
             yield event.plain_result("[Z-Library] 功能未启用。")

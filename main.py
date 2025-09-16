@@ -80,10 +80,12 @@ def _is_valid_zlib_book_id(book_id: str) -> bool:
     return str(book_id).isdigit()
 
 
-def _is_valid_zlib_book_hash(hash: str) -> bool:
+def _is_valid_zlib_book_hash(hash: Union[str, int]) -> bool:
     """检测 zlib Hash 是否为 6 位十六进制"""
     if not hash:
         return False
+    if isinstance(hash, int):
+        hash = str(hash)
     pattern = re.compile(r'^[a-f0-9]{6}$', re.IGNORECASE)  # 忽略大小写
     return bool(pattern.match(hash))
 
@@ -1208,7 +1210,7 @@ class ebooks(Star):
             raise ValueError("Unknown result type.")
 
     @zlib.command("download")
-    async def download_zlib(self, event: AstrMessageEvent, book_id = None, book_hash = None):
+    async def download_zlib(self, event: AstrMessageEvent, book_id: str = None, book_hash: Union[str, int] = None):
         """下载 Z-Library 电子书"""
         if not self.config.get("enable_zlib", False):
             yield event.plain_result("[Z-Library] 功能未启用。")

@@ -3,7 +3,7 @@ import random
 import re
 import xml.etree.ElementTree as ET
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Union
 from urllib.parse import quote_plus, urljoin, unquote, urlparse
 
 import aiofiles

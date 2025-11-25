@@ -23,7 +23,6 @@ class ZlibSource:
         self.proxy = proxy
         self.max_results = max_results
         self.temp_path = temp_path
-        self.cover_semaphore = asyncio.Semaphore(5)
         self.zlibrary = Zlibrary()
         self._init_login()
 
@@ -103,11 +102,7 @@ class ZlibSource:
                 chain = [Plain(f"{book.get('title', '未知')}")]
 
                 if book.get("cover"):
-                    async with self.cover_semaphore:
-                        base64_image = await download_and_convert_to_base64(
-                            book.get("cover"),
-                            proxy=self.proxy,
-                        )
+                    base64_image = await download_and_convert_to_base64(book.get("cover"), proxy=self.proxy)
                     if base64_image and is_base64_image(base64_image):
                         chain.append(Image.fromBase64(base64_image))
                     else:

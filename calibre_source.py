@@ -19,7 +19,6 @@ class CalibreSource(SharedSession):
         super().__init__(proxy)
         self.config = config
         self.max_results = max_results
-        self.cover_semaphore = asyncio.Semaphore(5)
 
     async def _search_calibre_web(self, query: str, limit: int = None):
         calibre_web_url = self.config.get("calibre_web_url", "http://127.0.0.1:8083")
@@ -133,16 +132,9 @@ class CalibreSource(SharedSession):
     async def _build_book_chain(self, item: dict) -> list:
         chain = [Plain(f"{item['title']}")]
         if item.get("cover_link"):
-            async with self.cover_semaphore:
-                base64_image = await download_and_convert_to_base64(
-                    item["cover_link"],
-                    proxy=self.proxy,
-                    session=await self.get_session(),
-                )
+            base64_image = await download_and_convert_to_base64(item["cover_link"], proxy=self.proxy)
             if is_base64_image(base64_image):
                 chain.append(Image.fromBase64(base64_image))
-            else:
-                chain.append(Plain("\n"))
         else:
             chain.append(Plain("\n"))
         chain.append(Plain(f"作者: {item.get('authors', '未知')}\n"))

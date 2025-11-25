@@ -11,62 +11,44 @@ from aiohttp import ClientPayloadError
 from bs4 import BeautifulSoup
 
 
-_reachability_cache = {}
-
-
-async def is_url_accessible(url: str, proxy: str = None, session: aiohttp.ClientSession = None, ttl: int = 60) -> bool:
-    """Check whether a URL is reachable with a short HEAD request, cached briefly."""
-    cache_key = (url, proxy)
-    now = asyncio.get_event_loop().time()
-    cached = _reachability_cache.get(cache_key)
-    if cached and now - cached[0] < ttl:
-        return cached[1]
-
+async def is_url_accessible(url: str, proxy: str = None) -> bool:
+    """Check whether a URL is reachable with a short HEAD request."""
     try:
-        sess = session or aiohttp.ClientSession()
-        async with sess.head(
-            url,
-            timeout=5,
-            proxy=proxy,
-            allow_redirects=True,
-        ) as response:
-            ok = response.status == 200
-            _reachability_cache[cache_key] = (now, ok)
-            return ok
+        async with aiohttp.ClientSession() as session:
+            async with session.head(
+                url,
+                timeout=5,
+                proxy=proxy,
+                allow_redirects=True,
+            ) as response:
+                return response.status == 200
     except Exception:
-        _reachability_cache[cache_key] = (now, False)
         return False
-    finally:
-        if session is None and 'sess' in locals():
-            await sess.close()
 
 
-async def download_and_convert_to_base64(cover_url: str, proxy: str = None, session: aiohttp.ClientSession = None):
+async def download_and_convert_to_base64(cover_url: str, proxy: str = None):
     """Fetch an image and convert it to base64 (handles HTML indirection)."""
     try:
-        sess = session or aiohttp.ClientSession()
-        async with sess.get(cover_url, proxy=proxy, timeout=5, headers={"User-Agent": "ebooks-plugin"}) as response:
-            if response.status != 200:
-                return None
+        async with aiohttp.ClientSession() as session:
+            async with session.get(cover_url, proxy=proxy) as response:
+                if response.status != 200:
+                    return None
 
-            content_type = response.headers.get("Content-Type", "").lower()
-            if "html" in content_type:
-                html_content = await response.text()
-                soup = BeautifulSoup(html_content, "html.parser")
-                img_tag = soup.find("meta", attrs={"property": "og:image"})
-                if img_tag:
-                    return await download_and_convert_to_base64(
-                        img_tag.get("content"),
-                        proxy=proxy,
-                        session=sess,
-                    )
-                return None
+                content_type = response.headers.get("Content-Type", "").lower()
+                if "html" in content_type:
+                    html_content = await response.text()
+                    soup = BeautifulSoup(html_content, "html.parser")
+                    img_tag = soup.find("meta", attrs={"property": "og:image"})
+                    if img_tag:
+                        return await download_and_convert_to_base64(
+                            img_tag.get("content"),
+                            proxy=proxy,
+                        )
+                    return None
 
-            content = await response.read()
-            if len(content) > 512 * 1024:
-                return None
-            base64_data = base64.b64encode(content).decode("utf-8")
-            return base64_data
+                content = await response.read()
+                base64_data = base64.b64encode(content).decode("utf-8")
+                return base64_data
     except ClientPayloadError:
         if "content" in locals():
             base64_data = base64.b64encode(content).decode("utf-8")
@@ -75,9 +57,6 @@ async def download_and_convert_to_base64(cover_url: str, proxy: str = None, sess
         return None
     except Exception:
         return None
-    finally:
-        if session is None and 'sess' in locals():
-            await sess.close()
 
 
 def is_base64_image(base64_data: str) -> bool:

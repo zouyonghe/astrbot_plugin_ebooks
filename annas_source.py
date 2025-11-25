@@ -18,13 +18,12 @@ class AnnasSource:
         self.config = config
         self.proxy = proxy
         self.max_results = max_results
-        self.cover_semaphore = asyncio.Semaphore(5)
 
     async def search_nodes(self, event, query: str, limit: int = 0):
         if not self.config.get("enable_annas", False):
             return "[Anna's Archive] 功能未启用。"
 
-        if not await is_url_accessible("https://annas-archive.org", proxy=self.proxy, session=None):
+        if not await is_url_accessible("https://annas-archive.org", proxy=self.proxy):
             return "[Anna's Archive] 无法连接到 Anna's Archive。"
 
         if not query:
@@ -45,11 +44,7 @@ class AnnasSource:
                 chain = [Plain(f"{book.title}\n")]
 
                 if book.thumbnail:
-                    async with self.cover_semaphore:
-                        base64_image = await download_and_convert_to_base64(
-                            book.thumbnail,
-                            proxy=self.proxy,
-                        )
+                    base64_image = await download_and_convert_to_base64(book.thumbnail, proxy=self.proxy)
                     if base64_image and is_base64_image(base64_image):
                         chain.append(Image.fromBase64(base64_image))
                     else:

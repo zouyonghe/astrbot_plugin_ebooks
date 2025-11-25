@@ -24,6 +24,7 @@ class ArchiveSource(SharedSession):
         self.config = config
         self.max_results = max_results
         self.temp_path = temp_path
+        self.cover_semaphore = asyncio.Semaphore(5)
 
     async def _search_archive_books(self, query: str, limit: int = 20):
         base_search_url = "https://archive.org/advancedsearch.php"
@@ -72,7 +73,7 @@ class ArchiveSource(SharedSession):
 
     async def _fetch_metadata(self, session: aiohttp.ClientSession, url: str, formats: tuple) -> dict:
         try:
-            response = await session.get(url, proxy=self.proxy)
+            response = await session.get(url, proxy=self.proxy, timeout=8)
             if response.status != 200:
                 logger.error(f"[archive.org] Error retrieving Metadata: Status code {response.status}")
                 return {}
@@ -128,7 +129,7 @@ class ArchiveSource(SharedSession):
         if not query:
             return "[archive.org] 请提供电子书关键词以进行搜索。"
 
-        if not await is_url_accessible("https://archive.org", proxy=self.proxy):
+        if not await is_url_accessible("https://archive.org", proxy=self.proxy, session=await self.get_session()):
             return "[archive.org] 无法连接到 archive.org。"
 
         if limit < 1:
@@ -145,7 +146,12 @@ class ArchiveSource(SharedSession):
                 chain = [Plain(f"{book.get('title', '未知')}")]
 
                 if book.get("cover"):
-                    base64_image = await download_and_convert_to_base64(book.get("cover"), proxy=self.proxy)
+                    async with self.cover_semaphore:
+                        base64_image = await download_and_convert_to_base64(
+                            book.get("cover"),
+                            proxy=self.proxy,
+                            session=await self.get_session(),
+                        )
                     if base64_image and is_base64_image(base64_image):
                         chain.append(Image.fromBase64(base64_image))
                     else:

@@ -14,6 +14,7 @@ from data.plugins.astrbot_plugin_ebooks.utils import (
     is_valid_archive_book_url,
     is_valid_calibre_book_url,
     is_valid_liber3_book_id,
+    to_event_results,
 )
 from data.plugins.astrbot_plugin_ebooks.zlib_source import ZlibSource
 
@@ -27,6 +28,9 @@ class ebooks(Star):
         self.TEMP_PATH = os.path.abspath("data/temp")
         os.makedirs(self.TEMP_PATH, exist_ok=True)
         self.max_results = self.config.get("max_results", 20)
+        if not isinstance(self.max_results, int) or not (1 <= self.max_results <= 100):
+            logger.warning("[ebooks] max_results 配置无效，已重置为 20")
+            self.max_results = 20
 
         if self.config.get("enable_calibre", False) and not self.config.get("calibre_web_url", "").strip():
             self.config["enable_calibre"] = False
@@ -40,28 +44,12 @@ class ebooks(Star):
         self.annas_source = AnnasSource(self.config, self.proxy, self.max_results)
 
     async def terminate(self):
-        self.zlib_source.terminate()
-
-    async def _yield_search_results(self, event: AstrMessageEvent, result, platform_name: str):
-        if isinstance(result, str):
-            yield event.plain_result(result)
-        elif isinstance(result, list):
-            if len(result) <= 30:
-                ns = Nodes(result)
-                yield event.chain_result([ns])
-            else:
-                ns = Nodes([])
-                for i in range(0, len(result), 30):
-                    chunk_results = result[i:i + 30]
-                    node = Node(
-                        uin=event.get_self_id(),
-                        name=platform_name,
-                        content=chunk_results,
-                    )
-                    ns.nodes.append(node)
-                yield event.chain_result([ns])
-        else:
-            raise ValueError("Unknown result type.")
+        await asyncio.gather(
+            self.calibre_source.close(),
+            self.liber3_source.close(),
+            self.archive_source.close(),
+            self.zlib_source.terminate(),
+        )
 
     async def _yield_download_results(self, results):
         for item in results:
@@ -74,7 +62,7 @@ class ebooks(Star):
     @calibre.command("search")
     async def search_calibre(self, event: AstrMessageEvent, query: str, limit: str = ""):
         result = await self.calibre_source.search_nodes(event, query, limit)
-        async for response in self._yield_search_results(event, result, "Calibre-Web"):
+        for response in to_event_results(event, "Calibre-Web", result):
             yield response
 
     @calibre.command("download")
@@ -106,7 +94,7 @@ class ebooks(Star):
     @liber3.command("search")
     async def search_liber3(self, event: AstrMessageEvent, query: str = None, limit: str = ""):
         result = await self.liber3_source.search_nodes(event, query, limit)
-        async for response in self._yield_search_results(event, result, "Liber3"):
+        for response in to_event_results(event, "Liber3", result):
             yield response
 
     @liber3.command("download")
@@ -132,7 +120,7 @@ class ebooks(Star):
     @archive.command("search")
     async def search_archive(self, event: AstrMessageEvent, query: str = None, limit: str = ""):
         result = await self.archive_source.search_nodes(event, query, limit)
-        async for response in self._yield_search_results(event, result, "archive.org"):
+        for response in to_event_results(event, "archive.org", result):
             yield response
 
     @archive.command("download")
@@ -158,7 +146,7 @@ class ebooks(Star):
     @zlib.command("search")
     async def search_zlib(self, event: AstrMessageEvent, query: str = None, limit: str = ""):
         result = await self.zlib_source.search_nodes(event, query, limit)
-        async for response in self._yield_search_results(event, result, "Z-Library"):
+        for response in to_event_results(event, "Z-Library", result):
             yield response
 
     @zlib.command("download")
@@ -184,7 +172,7 @@ class ebooks(Star):
     @annas.command("search")
     async def search_annas(self, event: AstrMessageEvent, query: str, limit: str = ""):
         result = await self.annas_source.search_nodes(event, query, limit)
-        async for response in self._yield_search_results(event, result, "anna's archive"):
+        for response in to_event_results(event, "anna's archive", result):
             yield response
 
     @annas.command("download")
@@ -297,7 +285,7 @@ class ebooks(Star):
                 yield event.chain_result([ns])
             else:
                 for platform_name, platform_results in named_results:
-                    async for response in self._yield_search_results(event, platform_results, platform_name):
+                    for response in to_event_results(event, platform_name, platform_results):
                         yield response
         except Exception as e:
             logger.error(f"[ebooks] Error during multi-platform search: {e}")

@@ -5,6 +5,7 @@ import re
 from typing import Union
 
 import aiohttp
+from astrbot.api.all import Node, Nodes
 from PIL import Image as Img
 from aiohttp import ClientPayloadError
 from bs4 import BeautifulSoup
@@ -142,3 +143,41 @@ def is_valid_archive_book_url(book_url: str) -> bool:
         return False
     pattern = re.compile(r"^https://archive\\.org/download/[^/]+/[^/]+$")
     return bool(pattern.match(book_url))
+
+
+class SharedSession:
+    """Provide a reusable aiohttp session per source."""
+
+    def __init__(self, proxy: str = None):
+        self.proxy = proxy
+        self._session: aiohttp.ClientSession = None
+
+    async def get_session(self) -> aiohttp.ClientSession:
+        if self._session is None or self._session.closed:
+            self._session = aiohttp.ClientSession()
+        return self._session
+
+    async def close_session(self):
+        if self._session and not self._session.closed:
+            await self._session.close()
+
+
+def to_event_results(event, platform_name: str, results, chunk_size: int = 30):
+    """Convert search results to event results with chunked forwarding."""
+    if isinstance(results, str):
+        return [event.plain_result(results)]
+    if isinstance(results, list):
+        if len(results) <= chunk_size:
+            ns = Nodes(results)
+            return [event.chain_result([ns])]
+        ns = Nodes([])
+        for i in range(0, len(results), chunk_size):
+            chunk_results = results[i : i + chunk_size]
+            node = Node(
+                uin=event.get_self_id(),
+                name=platform_name,
+                content=chunk_results,
+            )
+            ns.nodes.append(node)
+        return [event.chain_result([ns])]
+    raise ValueError("Unknown result type.")

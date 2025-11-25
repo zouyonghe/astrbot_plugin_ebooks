@@ -5,14 +5,15 @@ import aiohttp
 from astrbot.api.all import Plain, Node, Nodes, File, logger
 
 from data.plugins.astrbot_plugin_ebooks.utils import (
+    SharedSession,
     is_valid_liber3_book_id,
 )
 
 
-class Liber3Source:
+class Liber3Source(SharedSession):
     def __init__(self, config, proxy: str, max_results: int):
+        super().__init__(proxy)
         self.config = config
-        self.proxy = proxy
         self.max_results = max_results
 
     async def _get_liber3_book_details(self, book_ids: list) -> Optional[dict]:
@@ -21,12 +22,12 @@ class Liber3Source:
         payload = {"book_ids": book_ids}
 
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.post(detail_url, headers=headers, json=payload, proxy=self.proxy) as response:
-                    if response.status == 200:
-                        data = await response.json()
-                        return data.get("data", {}).get("book", {})
-                    logger.error(f"[Liber3] Error during detail request: Status code {response.status}")
+            session = await self.get_session()
+            async with session.post(detail_url, headers=headers, json=payload, proxy=self.proxy) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    return data.get("data", {}).get("book", {})
+                logger.error(f"[Liber3] Error during detail request: Status code {response.status}")
         except aiohttp.ClientError as e:
             logger.error(f"[Liber3] HTTP client error: {e}")
         except Exception as e:
@@ -39,27 +40,27 @@ class Liber3Source:
         payload = {"address": "", "word": word}
 
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.post(search_url, headers=headers, json=payload, proxy=self.proxy) as response:
-                    if response.status == 200:
-                        data = await response.json()
-                        book_data = data["data"].get("book", [])
-                        if not book_data:
-                            logger.info("[Liber3] 未找到匹配的电子书。")
-                            return None
+            session = await self.get_session()
+            async with session.post(search_url, headers=headers, json=payload, proxy=self.proxy) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    book_data = data["data"].get("book", [])
+                    if not book_data:
+                        logger.info("[Liber3] 未找到匹配的电子书。")
+                        return None
 
-                        book_ids = [item.get("id") for item in book_data[:limit]]
-                        if not book_ids:
-                            logger.info("[Liber3] 未能提取电子书 ID。")
-                            return None
+                    book_ids = [item.get("id") for item in book_data[:limit]]
+                    if not book_ids:
+                        logger.info("[Liber3] 未能提取电子书 ID。")
+                        return None
 
-                        detailed_books = await self._get_liber3_book_details(book_ids)
-                        if not detailed_books:
-                            logger.info("[Liber3] 未获取电子书详细信息。")
-                            return None
+                    detailed_books = await self._get_liber3_book_details(book_ids)
+                    if not detailed_books:
+                        logger.info("[Liber3] 未获取电子书详细信息。")
+                        return None
 
-                        return {"search_results": book_data[:limit], "detailed_books": detailed_books}
-                    logger.error(f"[Liber3] 请求电子书搜索失败，状态码: {response.status}")
+                    return {"search_results": book_data[:limit], "detailed_books": detailed_books}
+                logger.error(f"[Liber3] 请求电子书搜索失败，状态码: {response.status}")
         except aiohttp.ClientError as e:
             logger.error(f"[Liber3] HTTP 客户端错误: {e}")
         except Exception as e:
@@ -137,3 +138,6 @@ class Liber3Source:
         ebook_url = f"https://gateway-ipfs.st/ipfs/{ipfs_cid}?filename={book_name}.{extension}"
         file = File(name=f"{book_name}.{extension}", url=ebook_url)
         return [event.chain_result([file])]
+
+    async def close(self):
+        await self.close_session()

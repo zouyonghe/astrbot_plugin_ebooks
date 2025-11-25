@@ -8,6 +8,7 @@ import aiohttp
 from astrbot.api.all import Plain, Image, Node, Nodes, File, logger
 
 from data.plugins.astrbot_plugin_ebooks.utils import (
+    SharedSession,
     download_and_convert_to_base64,
     is_base64_image,
     is_url_accessible,
@@ -17,10 +18,10 @@ from data.plugins.astrbot_plugin_ebooks.utils import (
 )
 
 
-class ArchiveSource:
+class ArchiveSource(SharedSession):
     def __init__(self, config, proxy: str, max_results: int, temp_path: str):
+        super().__init__(proxy)
         self.config = config
-        self.proxy = proxy
         self.max_results = max_results
         self.temp_path = temp_path
 
@@ -38,36 +39,36 @@ class ArchiveSource:
             "output": "json",
         }
 
-        async with aiohttp.ClientSession() as session:
-            response = await session.get(base_search_url, params=params, proxy=self.proxy)
-            if response.status != 200:
-                logger.error(f"[archive.org] Error during search: archive.org API returned status code {response.status}")
-                return []
+        session = await self.get_session()
+        response = await session.get(base_search_url, params=params, proxy=self.proxy)
+        if response.status != 200:
+            logger.error(f"[archive.org] Error during search: archive.org API returned status code {response.status}")
+            return []
 
-            result_data = await response.json()
-            docs = result_data.get("response", {}).get("docs", [])
-            if not docs:
-                logger.info("[archive.org] 未找到匹配的电子书。")
-                return []
+        result_data = await response.json()
+        docs = result_data.get("response", {}).get("docs", [])
+        if not docs:
+            logger.info("[archive.org] 未找到匹配的电子书。")
+            return []
 
-            tasks = [self._fetch_metadata(session, base_metadata_url + doc["identifier"], formats) for doc in docs]
-            metadata_results = await asyncio.gather(*tasks)
+        tasks = [self._fetch_metadata(session, base_metadata_url + doc["identifier"], formats) for doc in docs]
+        metadata_results = await asyncio.gather(*tasks)
 
-            books = [
-                {
-                    "title": doc.get("title"),
-                    "cover": metadata.get("cover"),
-                    "authors": metadata.get("authors"),
-                    "language": metadata.get("language"),
-                    "year": metadata.get("year"),
-                    "publisher": metadata.get("publisher"),
-                    "download_url": metadata.get("download_url"),
-                    "description": metadata.get("description"),
-                }
-                for doc, metadata in zip(docs, metadata_results)
-                if metadata
-            ][:limit]
-            return books
+        books = [
+            {
+                "title": doc.get("title"),
+                "cover": metadata.get("cover"),
+                "authors": metadata.get("authors"),
+                "language": metadata.get("language"),
+                "year": metadata.get("year"),
+                "publisher": metadata.get("publisher"),
+                "download_url": metadata.get("download_url"),
+                "description": metadata.get("description"),
+            }
+            for doc, metadata in zip(docs, metadata_results)
+            if metadata
+        ][:limit]
+        return books
 
     async def _fetch_metadata(self, session: aiohttp.ClientSession, url: str, formats: tuple) -> dict:
         try:
@@ -185,39 +186,42 @@ class ArchiveSource:
             return [event.plain_result("[archive.org] 无法连接到 archive.org")]
 
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(book_url, allow_redirects=True, proxy=self.proxy, timeout=300) as response:
-                    if response.status == 200:
-                        ebook_url = str(response.url)
-                        logger.debug(f"[archive.org] 跳转后的下载地址: {ebook_url}")
+            session = await self.get_session()
+            async with session.get(book_url, allow_redirects=True, proxy=self.proxy, timeout=300) as response:
+                if response.status == 200:
+                    ebook_url = str(response.url)
+                    logger.debug(f"[archive.org] 跳转后的下载地址: {ebook_url}")
 
-                        content_disposition = response.headers.get("Content-Disposition", "")
-                        book_name = None
+                    content_disposition = response.headers.get("Content-Disposition", "")
+                    book_name = None
 
-                        if content_disposition:
-                            book_name_match = re.search(r'filename\*=(?:UTF-8\'\')?([^;]+)', content_disposition)
+                    if content_disposition:
+                        book_name_match = re.search(r'filename\*=(?:UTF-8\'\')?([^;]+)', content_disposition)
+                        if book_name_match:
+                            book_name = unquote(book_name_match.group(1))
+                        else:
+                            book_name_match = re.search(r'filename=["\']?([^;\']+)["\']?', content_disposition)
                             if book_name_match:
-                                book_name = unquote(book_name_match.group(1))
-                            else:
-                                book_name_match = re.search(r'filename=["\']?([^;\']+)["\']?', content_disposition)
-                                if book_name_match:
-                                    book_name = book_name_match.group(1)
+                                book_name = book_name_match.group(1)
 
-                        if not book_name or book_name.strip() == "":
-                            parsed_url = urlparse(ebook_url)
-                            book_name = os.path.basename(parsed_url.path) or "unknown_book"
+                    if not book_name or book_name.strip() == "":
+                        parsed_url = urlparse(ebook_url)
+                        book_name = os.path.basename(parsed_url.path) or "unknown_book"
 
-                        book_name = truncate_filename(book_name)
-                        temp_file_path = os.path.join(self.temp_path, book_name)
+                    book_name = truncate_filename(book_name)
+                    temp_file_path = os.path.join(self.temp_path, book_name)
 
-                        async with aiofiles.open(temp_file_path, "wb") as temp_file:
-                            await temp_file.write(await response.read())
+                    async with aiofiles.open(temp_file_path, "wb") as temp_file:
+                        await temp_file.write(await response.read())
 
-                        logger.info(f"[archive.org] 文件已下载并保存到临时目录：{temp_file_path}")
-                        file = File(name=book_name, file=temp_file_path)
-                        asyncio.create_task(self._cleanup_file(temp_file_path))
-                        return [event.chain_result([file])]
-                    return [event.plain_result(f"[archive.org] 无法下载电子书，状态码: {response.status}")]
+                    logger.info(f"[archive.org] 文件已下载并保存到临时目录：{temp_file_path}")
+                    file = File(name=book_name, file=temp_file_path)
+                    asyncio.create_task(self._cleanup_file(temp_file_path))
+                    return [event.chain_result([file])]
+                return [event.plain_result(f"[archive.org] 无法下载电子书，状态码: {response.status}")]
         except Exception as e:
             logger.error(f"[archive.org] 下载失败: {e}")
             return [event.plain_result(f"[archive.org] 下载电子书时发生错误，请稍后再试。")]
+
+    async def close(self):
+        await self.close_session()

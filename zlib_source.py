@@ -49,7 +49,7 @@ class ZlibSource:
         self.config.save_config()
         logger.info(f"[ebooks] {reason}")
 
-    def terminate(self):
+    async def terminate(self):
         if self.zlibrary and self.zlibrary.isLoggedIn():
             self.zlibrary = Zlibrary()
 

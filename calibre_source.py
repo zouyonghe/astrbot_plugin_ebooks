@@ -5,39 +5,39 @@ import xml.etree.ElementTree as ET
 from datetime import datetime
 from urllib.parse import quote_plus, urljoin, unquote, urlparse
 
-import aiohttp
 from astrbot.api.all import Plain, Image, Node, Nodes, File, logger
 
 from data.plugins.astrbot_plugin_ebooks.utils import (
+    SharedSession,
     download_and_convert_to_base64,
     is_base64_image,
     is_valid_calibre_book_url,
 )
 
 
-class CalibreSource:
+class CalibreSource(SharedSession):
     def __init__(self, config, proxy: str, max_results: int):
+        super().__init__(proxy)
         self.config = config
-        self.proxy = proxy
         self.max_results = max_results
 
     async def _search_calibre_web(self, query: str, limit: int = None):
         calibre_web_url = self.config.get("calibre_web_url", "http://127.0.0.1:8083")
         search_url = f"{calibre_web_url}/opds/search/{query}"
 
-        async with aiohttp.ClientSession() as session:
-            async with session.get(search_url) as response:
-                if response.status == 200:
-                    content_type = response.headers.get("Content-Type", "")
-                    if "application/atom+xml" in content_type:
-                        data = await response.text()
-                        return self._parse_opds_response(data, limit)
-                    logger.error(f"[Calibre-Web] Unexpected content type: {content_type}")
-                else:
-                    logger.error(
-                        f"[Calibre-Web] Error during search: Calibre-Web returned status code {response.status}"
-                    )
-                return None
+        session = await self.get_session()
+        async with session.get(search_url, proxy=self.proxy) as response:
+            if response.status == 200:
+                content_type = response.headers.get("Content-Type", "")
+                if "application/atom+xml" in content_type:
+                    data = await response.text()
+                    return self._parse_opds_response(data, limit)
+                logger.error(f"[Calibre-Web] Unexpected content type: {content_type}")
+            else:
+                logger.error(
+                    f"[Calibre-Web] Error during search: Calibre-Web returned status code {response.status}"
+                )
+            return None
 
     def _parse_opds_response(self, xml_data: str, limit: int = None):
         calibre_web_url = self.config.get("calibre_web_url", "http://127.0.0.1:8083")
@@ -195,28 +195,28 @@ class CalibreSource:
             return [event.plain_result("[Calibre-Web] 请提供有效的电子书链接。")]
 
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(book_url) as response:
-                    if response.status == 200:
-                        content_disposition = response.headers.get("Content-Disposition")
-                        book_name = None
+            session = await self.get_session()
+            async with session.get(book_url, proxy=self.proxy) as response:
+                if response.status == 200:
+                    content_disposition = response.headers.get("Content-Disposition")
+                    book_name = None
 
-                        if content_disposition:
-                            book_name_match = re.search(r'filename\*=(?:UTF-8\'\')?([^;]+)', content_disposition)
+                    if content_disposition:
+                        book_name_match = re.search(r'filename\*=(?:UTF-8\'\')?([^;]+)', content_disposition)
+                        if book_name_match:
+                            book_name = unquote(book_name_match.group(1))
+                        else:
+                            book_name_match = re.search(r'filename=["\']?([^;\']+)["\']?', content_disposition)
                             if book_name_match:
-                                book_name = unquote(book_name_match.group(1))
-                            else:
-                                book_name_match = re.search(r'filename=["\']?([^;\']+)["\']?', content_disposition)
-                                if book_name_match:
-                                    book_name = book_name_match.group(1)
+                                book_name = book_name_match.group(1)
 
-                        if not book_name or book_name.strip() == "":
-                            logger.error(f"[Calibre-Web] 无法提取书名，电子书地址: {book_url}")
-                            return [event.plain_result("[Calibre-Web] 无法提取书名，取消发送电子书。")]
+                    if not book_name or book_name.strip() == "":
+                        logger.error(f"[Calibre-Web] 无法提取书名，电子书地址: {book_url}")
+                        return [event.plain_result("[Calibre-Web] 无法提取书名，取消发送电子书。")]
 
-                        file = File(name=book_name, url=book_url)
-                        return [event.chain_result([file])]
-                    return [event.plain_result(f"[Calibre-Web] 无法下载电子书，状态码: {response.status}")]
+                    file = File(name=book_name, url=book_url)
+                    return [event.chain_result([file])]
+                return [event.plain_result(f"[Calibre-Web] 无法下载电子书，状态码: {response.status}")]
         except Exception as e:
             logger.error(f"[Calibre-Web] 下载失败: {e}")
             return [event.plain_result("[Calibre-Web] 下载电子书时发生错误，请稍后再试。")]
@@ -250,3 +250,6 @@ class CalibreSource:
         except Exception as e:
             logger.error(f"[Calibre-Web] 推荐电子书时发生错误: {e}")
             return [event.plain_result("[Calibre-Web] 推荐电子书时发生错误，请稍后再试。")]
+
+    async def close(self):
+        await self.close_session()

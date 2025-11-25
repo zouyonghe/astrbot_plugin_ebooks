@@ -3,10 +3,9 @@ import random
 import re
 import xml.etree.ElementTree as ET
 from datetime import datetime
-from urllib.parse import quote_plus, urljoin, unquote, urlparse
+from urllib.parse import quote_plus, urljoin, unquote
 
 from astrbot.api.all import Plain, Image, Node, Nodes, File, logger
-
 from data.plugins.astrbot_plugin_ebooks.utils import (
     SharedSession,
     download_and_convert_to_base64,
@@ -166,7 +165,7 @@ class CalibreSource(SharedSession):
         tasks = [construct_node(book) for book in results]
         return await asyncio.gather(*tasks)
 
-    async def search_nodes(self, event, query: str, limit: str = ""):
+    async def search_nodes(self, event, query: str, limit: str|int = ""):
         if not self.config.get("enable_calibre", False):
             return "[Calibre-Web] 功能未启用。"
 

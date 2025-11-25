@@ -181,3 +181,21 @@ def to_event_results(event, platform_name: str, results, chunk_size: int = 30):
             ns.nodes.append(node)
         return [event.chain_result([ns])]
     raise ValueError("Unknown result type.")
+
+
+def normalize_limit(limit, default: int, min_value: int, max_value: int, clamp_max: bool = False):
+    """Normalize limit input from string/int and enforce bounds."""
+    value = default
+    if isinstance(limit, int):
+        value = limit
+    elif isinstance(limit, str) and limit.strip().isdigit():
+        value = int(limit)
+
+    if value < min_value:
+        return None, f"请确认搜索返回结果数量在 {min_value}-{max_value} 之间。"
+    if value > max_value:
+        if clamp_max:
+            value = max_value
+        else:
+            return None, f"请确认搜索返回结果数量在 {min_value}-{max_value} 之间。"
+    return value, None

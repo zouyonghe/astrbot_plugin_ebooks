@@ -121,7 +121,7 @@ class ArchiveSource(SharedSession):
         except Exception:
             pass
 
-    async def search_nodes(self, event, query: str = None, limit: str = ""):
+    async def search_nodes(self, event, query: str = None, limit: int = 0):
         if not self.config.get("enable_archive", False):
             return "[archive.org] 功能未启用。"
 
@@ -131,11 +131,8 @@ class ArchiveSource(SharedSession):
         if not await is_url_accessible("https://archive.org", proxy=self.proxy):
             return "[archive.org] 无法连接到 archive.org。"
 
-        limit = int(limit) if str(limit).isdigit() else self.max_results
         if limit < 1:
             return "[archive.org] 请确认搜索返回结果数量在 1-60 之间。"
-        if limit > 60:
-            limit = 60
 
         try:
             logger.info(f"[archive.org] Received books search query: {query}, limit: {limit}")

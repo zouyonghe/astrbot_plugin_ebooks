@@ -67,14 +67,13 @@ class Liber3Source(SharedSession):
             logger.error(f"[Liber3] 发生意外错误: {e}")
         return None
 
-    async def search_nodes(self, event, query: str, limit: str = ""):
+    async def search_nodes(self, event, query: str, limit: int):
         if not self.config.get("enable_liber3", False):
             return "[Liber3] 功能未启用。"
 
         if not query:
             return "[Liber3] 请提供电子书关键词以进行搜索。"
 
-        limit = int(limit) if str(limit).isdigit() else int(self.max_results)
         if not (1 <= limit <= 100):
             return "[Liber3] 请确认搜索返回结果数量在 1-100 之间。"
 

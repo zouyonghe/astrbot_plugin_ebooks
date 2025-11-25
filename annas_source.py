@@ -19,7 +19,7 @@ class AnnasSource:
         self.proxy = proxy
         self.max_results = max_results
 
-    async def search_nodes(self, event, query: str, limit: str = ""):
+    async def search_nodes(self, event, query: str, limit: int = 0):
         if not self.config.get("enable_annas", False):
             return "[Anna's Archive] 功能未启用。"
 
@@ -29,11 +29,8 @@ class AnnasSource:
         if not query:
             return "[Anna's Archive] 请提供电子书关键词以进行搜索。"
 
-        limit = int(limit) if str(limit).isdigit() else self.max_results
         if limit < 1:
             return "[Anna's Archive] 请确认搜索返回结果数量在 1-60 之间。"
-        if limit > 60:
-            limit = 60
 
         try:
             logger.info(f"[Anna's Archive] Received books search query: {query}, limit: {limit}")

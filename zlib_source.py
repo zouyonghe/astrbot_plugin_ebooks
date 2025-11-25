@@ -70,7 +70,7 @@ class ZlibSource:
             retry_count += 1
         return False
 
-    async def search_nodes(self, event, query: str, limit: str = ""):
+    async def search_nodes(self, event, query: str, limit: int = 0):
         if not self.config.get("enable_zlib", False):
             return "[Z-Library] 功能未启用。"
 
@@ -80,7 +80,6 @@ class ZlibSource:
         if not query:
             return "[Z-Library] 请提供电子书关键词以进行搜索。"
 
-        limit = int(limit) if str(limit).isdigit() else self.max_results
         if limit < 1:
             return "[Z-Library] 请确认搜索返回结果数量在 1-60 之间。"
         if limit > 60:

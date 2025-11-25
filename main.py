@@ -11,6 +11,7 @@ from data.plugins.astrbot_plugin_ebooks.utils import (
     is_valid_archive_book_url,
     is_valid_calibre_book_url,
     is_valid_liber3_book_id,
+    normalize_limit,
     to_event_results,
 )
 from data.plugins.astrbot_plugin_ebooks.zlib_source import ZlibSource
@@ -58,7 +59,11 @@ class ebooks(Star):
 
     @calibre.command("search")
     async def search_calibre(self, event: AstrMessageEvent, query: str, limit: str = ""):
-        result = await self.calibre_source.search_nodes(event, query, limit)
+        limit_value, err = normalize_limit(limit, self.max_results, 1, 100)
+        if err:
+            yield event.plain_result(f"[Calibre-Web] {err}")
+            return
+        result = await self.calibre_source.search_nodes(event, query, limit_value)
         for response in to_event_results(event, "Calibre-Web", result):
             yield response
 
@@ -88,7 +93,11 @@ class ebooks(Star):
 
     @liber3.command("search")
     async def search_liber3(self, event: AstrMessageEvent, query: str = None, limit: str = ""):
-        result = await self.liber3_source.search_nodes(event, query, limit)
+        limit_value, err = normalize_limit(limit, self.max_results, 1, 100)
+        if err:
+            yield event.plain_result(f"[Liber3] {err}")
+            return
+        result = await self.liber3_source.search_nodes(event, query, limit_value)
         for response in to_event_results(event, "Liber3", result):
             yield response
 
@@ -113,7 +122,11 @@ class ebooks(Star):
 
     @archive.command("search")
     async def search_archive(self, event: AstrMessageEvent, query: str = None, limit: str = ""):
-        result = await self.archive_source.search_nodes(event, query, limit)
+        limit_value, err = normalize_limit(limit, self.max_results, 1, 60, clamp_max=True)
+        if err:
+            yield event.plain_result(f"[archive.org] {err}")
+            return
+        result = await self.archive_source.search_nodes(event, query, limit_value)
         for response in to_event_results(event, "archive.org", result):
             yield response
 
@@ -140,7 +153,11 @@ class ebooks(Star):
 
     @zlib.command("search")
     async def search_zlib(self, event: AstrMessageEvent, query: str = None, limit: str = ""):
-        result = await self.zlib_source.search_nodes(event, query, limit)
+        limit_value, err = normalize_limit(limit, self.max_results, 1, 60, clamp_max=True)
+        if err:
+            yield event.plain_result(f"[Z-Library] {err}")
+            return
+        result = await self.zlib_source.search_nodes(event, query, limit_value)
         for response in to_event_results(event, "Z-Library", result):
             yield response
 
@@ -167,7 +184,11 @@ class ebooks(Star):
 
     @annas.command("search")
     async def search_annas(self, event: AstrMessageEvent, query: str, limit: str = ""):
-        result = await self.annas_source.search_nodes(event, query, limit)
+        limit_value, err = normalize_limit(limit, self.max_results, 1, 60, clamp_max=True)
+        if err:
+            yield event.plain_result(f"[Anna's Archive] {err}")
+            return
+        result = await self.annas_source.search_nodes(event, query, limit_value)
         for response in to_event_results(event, "anna's archive", result):
             yield response
 
@@ -235,13 +256,13 @@ class ebooks(Star):
 
     @ebooks.command("search")
     async def search_all_platforms(self, event: AstrMessageEvent, query: str = None, limit: str = ""):
-        limit = int(limit) if str(limit).isdigit() else int(self.max_results)
+        limit, err = normalize_limit(limit, self.max_results, 1, 50)
         if not query:
             yield event.plain_result("[ebooks] 请提供电子书关键词以进行搜索。")
             return
 
-        if not (1 <= int(limit) <= 50):
-            yield event.plain_result("[ebooks] 请确认搜索返回结果数量在 1-100 之间。")
+        if err:
+            yield event.plain_result(f"[ebooks] {err}")
             return
 
         tasks = []

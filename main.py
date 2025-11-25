@@ -79,11 +79,27 @@ class ebooks(Star):
 
     # @llm_tool("search_calibre_books")
     async def search_calibre_books(self, event: AstrMessageEvent, query: str):
+        """Search books by keywords or title through Calibre-Web.
+        When to use:
+            Use this method to search for books in the Calibre-Web catalog when the user knows the title or keyword.
+            This method cannot be used for downloading books and should only be used for searching purposes.
+
+        Args:
+            query (string): The search keyword or title to find books in the Calibre-Web catalog.
+        """
         async for result in self.search_calibre(event, query):
             yield result
 
     # @llm_tool("download_calibre_book")
     async def download_calibre_book(self, event: AstrMessageEvent, book_url: str):
+        """Download a book by a precise name or URL through Calibre-Web.
+        When to use:
+            Use this method to download a specific book by its name or when a direct download link is available.
+    
+        Args:
+            book_url (string): The book name (exact match) or the URL of the book link.
+
+        """
         async for result in self.download_calibre(event, book_url):
             yield result
 
@@ -105,11 +121,27 @@ class ebooks(Star):
 
     # @llm_tool("search_liber3_books")
     async def search_liber3_books(self, event: AstrMessageEvent, query: str):
+        """Search for books using Liber3 API and return a detailed result list.
+
+        When to use:
+            Invoke this tool to locate books based on keywords or titles from Liber3's library.
+
+        Args:
+            query (string): The keyword or title to search for books.
+        """
         async for result in self.search_liber3(event, query):
             yield result
 
     # @llm_tool("download_liber3_book")
     async def download_liber3_book(self, event: AstrMessageEvent, book_id: str):
+        """Download a book using Liber3's API via its unique ID.
+
+        When to use:
+            This tool allows you to retrieve a Liber3 book using the unique ID and download it.
+
+        Args:
+            book_id (string): A valid Liber3 book ID required to download a book.
+        """
         async for result in self.download_liber3(event, book_id):
             yield result
 
@@ -131,11 +163,27 @@ class ebooks(Star):
 
     # @llm_tool("search_archive_books")
     async def search_archive_books(self, event: AstrMessageEvent, query: str):
+        """Search for eBooks using the archive.org API.
+    
+        When to use:
+            Utilize this method to search books available in supported formats (such as PDF or EPUB) on the archive.org API platform.
+    
+        Args:
+            query (string): The keywords or title to perform the search.
+        """
         async for result in self.search_archive(event, query):
             yield result
 
     # @llm_tool("download_archive_book")
     async def download_archive_book(self, event: AstrMessageEvent, download_url: str):
+        """Download an eBook from the archive.org API using its download URL.
+    
+        When to use:
+            Use this method to download a specific book from the archive.org platform using the book's provided download link.
+    
+        Args:
+            download_url (string): A valid and supported archive.org book download URL.
+        """
         async for result in self.download_archive(event, download_url):
             yield result
 
@@ -157,11 +205,28 @@ class ebooks(Star):
 
     # @llm_tool("search_zlib_books")
     async def search_zlib_books(self, event: AstrMessageEvent, query: str):
+        """Search Zlibrary for books using given keywords.
+
+        When to use:
+            Use this method to locate books by keywords or title in Z-Library's database.
+
+        Args:
+            query (string): The search term to perform the lookup.
+        """
         async for result in self.search_zlib(event, query):
             yield result
 
     # @llm_tool("download_zlib_book")
     async def download_zlib_book(self, event: AstrMessageEvent, book_id: str, book_hash: str):
+        """Download a book from Z-Library using its book ID and hash.
+    
+        When to use:
+            Use this method for downloading books from Zlibrary with the provided ID and hash.
+    
+        Args:
+            book_id (string): The unique identifier for the book.
+            book_hash (string): Hash value required to authorize and retrieve the download.
+        """
         async for result in self.download_zlib(event, book_id, book_hash):
             yield result
 

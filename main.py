@@ -17,7 +17,7 @@ from data.plugins.astrbot_plugin_ebooks.utils import (
 from data.plugins.astrbot_plugin_ebooks.zlib_source import ZlibSource
 
 
-@register("ebooks", "buding", "一个功能强大的电子书搜索和下载插件", "1.1.3", "https://github.com/zouyonghe/astrbot_plugin_ebooks")
+@register("ebooks", "buding", "一个功能强大的电子书搜索和下载插件", "2.0.0", "https://github.com/zouyonghe/astrbot_plugin_ebooks")
 class ebooks(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
         super().__init__(context)

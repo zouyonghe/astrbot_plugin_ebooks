@@ -146,5 +146,5 @@
 - **插件名称**：ebooks
 - **标识符**：buding
 - **描述**：一个功能强大的电子书搜索和下载插件
-- **版本**：1.0.10
+- **版本**：2.0.0
 - **源码**：[GitHub 地址](https://github.com/zouyonghe/astrbot_plugin_ebooks)

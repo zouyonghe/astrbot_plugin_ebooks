@@ -15,6 +15,7 @@ from data.plugins.astrbot_plugin_ebooks.utils import (
 )
 
 MAX_ZLIB_RETRY_COUNT = 3
+MAX_ZLIB_SEARCH_RETRY_COUNT = 3
 
 
 class ZlibSource:
@@ -91,12 +92,25 @@ class ZlibSource:
             if not self._ensure_login():
                 return "[Z-Library] 登录失败。"
 
-            results = self.zlibrary.search(message=query, limit=limit)
+            results = None
+            had_exception = False
+            for attempt in range(MAX_ZLIB_SEARCH_RETRY_COUNT):
+                try:
+                    results = self.zlibrary.search(message=query, limit=limit)
+                    if results and results.get("books"):
+                        break
+                except Exception as e:
+                    had_exception = True
+                    logger.warning(f"[Z-Library] Search attempt {attempt + 1} failed: {e}")
+                if attempt < MAX_ZLIB_SEARCH_RETRY_COUNT - 1:
+                    await asyncio.sleep(0.5)
 
-            if not results or not results.get("books"):
+            if results and results.get("books"):
+                books = results.get("books", [])
+            elif had_exception:
+                return "[Z-Library] 暂时无法连接到 Z-Library，请稍后再试。"
+            else:
                 return "[Z-Library] 未找到匹配的电子书。"
-
-            books = results.get("books", [])
 
             async def construct_node(book):
                 chain = [Plain(f"{book.get('title', '未知')}")]

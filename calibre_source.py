@@ -184,7 +184,7 @@ class CalibreSource(SharedSession):
             return await self._convert_calibre_results_to_nodes(event, results)
         except Exception as e:
             logger.error(f"[Calibre-Web] 搜索失败: {e}")
-            return "Calibre-Web] 搜索失败，请检查控制台输出"
+            return "[Calibre-Web] 搜索电子书时发生错误，请稍后再试。"
 
     async def download(self, event, book_url: str = None):
         if not self.config.get("enable_calibre", False):

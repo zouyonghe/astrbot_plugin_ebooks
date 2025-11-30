@@ -111,7 +111,7 @@ class Liber3Source(SharedSession):
             return await asyncio.gather(*tasks)
         except Exception as e:
             logger.error(f"[Liber3] 搜索失败: {e}")
-            return "[Liber3] 发生错误，请稍后再试。"
+            return "[Liber3] 搜索电子书时发生错误，请稍后再试。"
 
     async def download(self, event, book_id: str = None):
         if not self.config.get("enable_liber3", False):

@@ -180,7 +180,7 @@ class ArchiveSource(SharedSession):
             return [event.plain_result("[archive.org] 请提供有效的下载链接。")]
 
         if not await is_url_accessible("https://archive.org", proxy=self.proxy):
-            return [event.plain_result("[archive.org] 无法连接到 archive.org")]
+            return [event.plain_result("[archive.org] 无法连接到 archive.org。")]
 
         try:
             session = await self.get_session()

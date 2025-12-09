@@ -5,10 +5,12 @@ from requests import get
 class HTTPFailed(Exception):
     pass
 
+REQUEST_TIMEOUT = (5, 30)
+
 
 def html_parser(url: str, params: dict = {}) -> NavigableString:
     params = dict(filter(lambda i: i[1], params.items()))
-    response = get(url, params=params)
+    response = get(url, params=params, timeout=REQUEST_TIMEOUT)
     if response.status_code >= 400:
         raise HTTPFailed(f"server returned http status {response.status_code}")
     # Uncomment code that would be dynamically rendered by JavaScript

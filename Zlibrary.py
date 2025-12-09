@@ -19,6 +19,7 @@ class Zlibrary:
         remix_userid: [int, str] = None,
         remix_userkey: str = None,
     ):
+        self.__timeout = (5, 30)
         self.__email: str
         self.__name: str
         self.__kindle_email: str
@@ -99,6 +100,7 @@ class Zlibrary:
             "data": data,
             "cookies": self.__cookies,
             "headers": self.__headers,
+            "timeout": self.__timeout,
         }
         if self.__proxies:
             payload["proxies"] = self.__proxies
@@ -119,6 +121,7 @@ class Zlibrary:
             "params": params,
             "cookies": self.__cookies if cookies is None else cookies,
             "headers": self.__headers,
+            "timeout": self.__timeout,
         }
         if self.__proxies:
             payload["proxies"] = self.__proxies
@@ -301,7 +304,7 @@ class Zlibrary:
         )
 
     def __getImageData(self, url: str) -> requests.Response.content:
-        res = requests.get(url, headers=self.__headers)
+        res = requests.get(url, headers=self.__headers, timeout=self.__timeout)
         if res.status_code == 200:
             return res.content
 

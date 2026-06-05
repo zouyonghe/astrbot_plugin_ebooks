@@ -92,6 +92,7 @@ class FakeZlibrary:
 
     def login(self, email, password):
         self.logged_in = bool(email and password)
+        return {"success": self.logged_in}
 
     def search(self, message=None, limit=None):
         self.search_called = True
@@ -123,8 +124,15 @@ async def no_cover(*args, **kwargs):
     return None
 
 
+async def fail_url_accessible(*args, **kwargs):
+    utils_module.url_accessible_called = True
+    raise AssertionError("is_url_accessible() should not be called during Z-Library search")
+
+
+utils_module.url_accessible_called = False
 utils_module.download_and_convert_to_base64 = no_cover
 utils_module.is_base64_image = lambda value: False
+utils_module.is_url_accessible = fail_url_accessible
 utils_module.is_valid_zlib_book_hash = lambda value: True
 utils_module.is_valid_zlib_book_id = lambda value: True
 utils_module.truncate_filename = lambda value: value
@@ -160,6 +168,7 @@ class ZlibSourceTest(unittest.IsolatedAsyncioTestCase):
                 sys.modules[name] = module
 
     async def test_search_uses_zlibrary_api_without_homepage_probe(self):
+        utils_module.url_accessible_called = False
         source = ZlibSource(
             Config(
                 {
@@ -178,6 +187,7 @@ class ZlibSourceTest(unittest.IsolatedAsyncioTestCase):
         self.assertIsInstance(result, list)
         self.assertEqual(1, len(result))
         self.assertTrue(source.zlibrary.search_called)
+        self.assertFalse(utils_module.url_accessible_called)
 
 
 if __name__ == "__main__":

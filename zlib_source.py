@@ -8,7 +8,6 @@ from data.plugins.astrbot_plugin_ebooks.Zlibrary import Zlibrary
 from data.plugins.astrbot_plugin_ebooks.utils import (
     download_and_convert_to_base64,
     is_base64_image,
-    is_url_accessible,
     is_valid_zlib_book_hash,
     is_valid_zlib_book_id,
     truncate_filename,
@@ -74,9 +73,6 @@ class ZlibSource:
     async def search_nodes(self, event, query: str, limit: int = 0):
         if not self.config.get("enable_zlib", False):
             return "[Z-Library] 功能未启用。"
-
-        if not await is_url_accessible("https://z-library.sk", proxy=self.proxy):
-            return "[Z-Library] 无法连接到 Z-Library。"
 
         if not query:
             return "[Z-Library] 请提供电子书关键词以进行搜索。"
@@ -163,9 +159,6 @@ class ZlibSource:
 
         if not is_valid_zlib_book_id(book_id) or not is_valid_zlib_book_hash(book_hash):
             return [event.plain_result("[Z-Library] 请使用 /zlib download <id> <hash> 下载。")]
-
-        if not await is_url_accessible("https://z-library.sk", proxy=self.proxy):
-            return [event.plain_result("[Z-Library] 无法连接到 Z-Library。")]
 
         try:
             if not self._ensure_login():

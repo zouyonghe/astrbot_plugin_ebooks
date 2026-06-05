@@ -1,4 +1,3 @@
-import asyncio
 import importlib.util
 import sys
 import tempfile
@@ -8,6 +7,19 @@ from pathlib import Path
 
 
 PLUGIN_ROOT = Path(__file__).resolve().parents[1]
+STUBBED_MODULES = (
+    "astrbot",
+    "astrbot.api",
+    "astrbot.api.all",
+    "data",
+    "data.plugins",
+    "data.plugins.astrbot_plugin_ebooks",
+    "data.plugins.astrbot_plugin_ebooks.Zlibrary",
+    "data.plugins.astrbot_plugin_ebooks.utils",
+    "data.plugins.astrbot_plugin_ebooks.zlib_source",
+)
+_MISSING = object()
+ORIGINAL_MODULES = {name: sys.modules.get(name, _MISSING) for name in STUBBED_MODULES}
 
 
 class Plain:
@@ -138,8 +150,16 @@ class Event:
         return "10000"
 
 
-class ZlibSourceTest(unittest.TestCase):
-    def test_search_uses_zlibrary_api_without_homepage_probe(self):
+class ZlibSourceTest(unittest.IsolatedAsyncioTestCase):
+    @classmethod
+    def tearDownClass(cls):
+        for name, module in ORIGINAL_MODULES.items():
+            if module is _MISSING:
+                sys.modules.pop(name, None)
+            else:
+                sys.modules[name] = module
+
+    async def test_search_uses_zlibrary_api_without_homepage_probe(self):
         source = ZlibSource(
             Config(
                 {
@@ -153,7 +173,7 @@ class ZlibSourceTest(unittest.TestCase):
             temp_path=tempfile.gettempdir(),
         )
 
-        result = asyncio.run(source.search_nodes(Event(), "百万英镑", 20))
+        result = await source.search_nodes(Event(), "百万英镑", 20)
 
         self.assertIsInstance(result, list)
         self.assertEqual(1, len(result))

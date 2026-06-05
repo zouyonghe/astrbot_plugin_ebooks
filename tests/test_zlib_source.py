@@ -1,12 +1,13 @@
 import asyncio
+import importlib.util
 import sys
+import tempfile
 import types
 import unittest
 from pathlib import Path
 
 
-ASTRBOT_ROOT = Path(__file__).resolve().parents[4]
-sys.path.insert(0, str(ASTRBOT_ROOT))
+PLUGIN_ROOT = Path(__file__).resolve().parents[1]
 
 
 class Plain:
@@ -62,6 +63,11 @@ astrbot_all.logger = Logger()
 sys.modules.setdefault("astrbot", types.ModuleType("astrbot"))
 sys.modules.setdefault("astrbot.api", types.ModuleType("astrbot.api"))
 sys.modules["astrbot.api.all"] = astrbot_all
+sys.modules.setdefault("data", types.ModuleType("data"))
+sys.modules.setdefault("data.plugins", types.ModuleType("data.plugins"))
+plugin_package = types.ModuleType("data.plugins.astrbot_plugin_ebooks")
+plugin_package.__path__ = [str(PLUGIN_ROOT)]
+sys.modules["data.plugins.astrbot_plugin_ebooks"] = plugin_package
 
 
 class FakeZlibrary:
@@ -101,23 +107,25 @@ sys.modules["data.plugins.astrbot_plugin_ebooks.Zlibrary"] = zlibrary_module
 utils_module = types.ModuleType("data.plugins.astrbot_plugin_ebooks.utils")
 
 
-async def inaccessible_url(*args, **kwargs):
-    return False
-
-
 async def no_cover(*args, **kwargs):
     return None
 
 
 utils_module.download_and_convert_to_base64 = no_cover
 utils_module.is_base64_image = lambda value: False
-utils_module.is_url_accessible = inaccessible_url
 utils_module.is_valid_zlib_book_hash = lambda value: True
 utils_module.is_valid_zlib_book_id = lambda value: True
 utils_module.truncate_filename = lambda value: value
 sys.modules["data.plugins.astrbot_plugin_ebooks.utils"] = utils_module
 
-from data.plugins.astrbot_plugin_ebooks.zlib_source import ZlibSource
+spec = importlib.util.spec_from_file_location(
+    "data.plugins.astrbot_plugin_ebooks.zlib_source",
+    PLUGIN_ROOT / "zlib_source.py",
+)
+zlib_source = importlib.util.module_from_spec(spec)
+sys.modules[spec.name] = zlib_source
+spec.loader.exec_module(zlib_source)
+ZlibSource = zlib_source.ZlibSource
 
 
 class Config(dict):
@@ -131,7 +139,7 @@ class Event:
 
 
 class ZlibSourceTest(unittest.TestCase):
-    def test_search_uses_zlibrary_api_even_when_homepage_head_is_blocked(self):
+    def test_search_uses_zlibrary_api_without_homepage_probe(self):
         source = ZlibSource(
             Config(
                 {
@@ -142,7 +150,7 @@ class ZlibSourceTest(unittest.TestCase):
             ),
             proxy=None,
             max_results=20,
-            temp_path="/tmp",
+            temp_path=tempfile.gettempdir(),
         )
 
         result = asyncio.run(source.search_nodes(Event(), "百万英镑", 20))
